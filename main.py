@@ -63,7 +63,7 @@ train_dataloader = DataLoader(train_dataset, batch_size=4096, shuffle=True)
 test_dataloader = DataLoader(test_dataset, batch_size=4096, shuffle=True)
 
 # Modify the training loop to handle batches of data
-for epoch in range(1000):
+for epoch in range(1, 10000 + 1):
     # print learning rate
     for param_group in optimizer.param_groups:
         print("Learning rate:", param_group['lr'])
@@ -87,5 +87,9 @@ for epoch in range(1000):
     if epoch % 400 == 0:
         for param_group in optimizer.param_groups:
             param_group['lr'] = param_group['lr'] * 0.1
+
+    # checkpoint
+    if epoch % 10 == 0:
+        torch.save(net.state_dict(), f"model_{epoch}.pt")
 
     print(f"Epoch {epoch} loss: {loss.item()}, Test loss: {test_loss / len(test_dataloader)}")
