@@ -5,9 +5,12 @@ import torch
 from torch.utils.data import TensorDataset, DataLoader
 from tqdm import tqdm
 
-X_COLUMNS = ["l0", "l1", "l2", "l3", "l4", "l5", "l6"]
+Y_COLUMNS = ["l0", "l1", "l2", "l3", "l4", "l5", "l6"]
 # Y_COLUMNS = ["px", "py", "pz", "ox", "oy", "oz", "ow"]
-Y_COLUMNS = ["px", "py", "pz"]
+# X_COLUMNS = ["px", "py", "pz"]
+X_COLUMNS = ["px", "py", "pz", "l0", "l1", "l2", "l3", "l4", "l5", "l6"]
+
+CONDITION_COLUMNS = ["px", "py", "pz"]
 
 
 def get_device() -> torch.device:
@@ -24,40 +27,90 @@ x_data = df[X_COLUMNS].to_numpy()
 y_data = df[Y_COLUMNS].to_numpy()
 
 
-class Net(nn.Module):
-    def __init__(self, input_size, output_size):
-        super(Net, self).__init__()
-
-        self.bn0 = nn.BatchNorm1d(input_size)
+class CVAEEncoder(nn.Module):
+    def __init__(self, input_size, hidden_size):
+        super(CVAEEncoder, self).__init__()
 
         self.fc1 = nn.Linear(input_size, 256)
-        self.bn1 = nn.BatchNorm1d(256)  # BatchNorm after first hidden layer
+        self.bn1 = nn.BatchNorm1d(256)
 
         self.fc2 = nn.Linear(256, 256)
-        self.bn2 = nn.BatchNorm1d(256)  # BatchNorm after second hidden layer
+        self.bn2 = nn.BatchNorm1d(256)
 
         self.fc3 = nn.Linear(256, 256)
-        self.bn3 = nn.BatchNorm1d(256)  # BatchNorm after third hidden layer
+        self.bn3 = nn.BatchNorm1d(256)
 
-        self.fc4 = nn.Linear(256, 256)
-        self.bn4 = nn.BatchNorm1d(256)  # BatchNorm after fourth hidden layer
-
-        self.fc5 = nn.Linear(256, output_size)
+        self.mean = nn.Linear(256, hidden_size)
+        self.logvar = nn.Linear(256, hidden_size)
 
     def forward(self, x):
-        x = self.bn0(x)
         x1 = self.bn1(torch.relu(self.fc1(x)))
         x2 = self.bn2(torch.relu(self.fc2(x1)))
-        x3 = self.bn3(torch.relu(self.fc3(x2 + x1)))  # Skip connection from 1st to 3rd layer
-        x4 = self.bn4(torch.relu(self.fc4(x3 + x2)))  # Skip connection from 2nd to 4th layer
-        x5 = self.fc5(x4 + x3)  # Skip connection from 3rd to output layer
-        return x5
+        x3 = self.bn3(torch.relu(self.fc3(x2)))
+
+        mean = self.mean(x3)
+        logvar = self.logvar(x3)
+
+        return mean, logvar
+
+
+class CVAEDecoder(nn.Module):
+
+    def __init__(self, output_size, hidden_size):
+        super(CVAEDecoder, self).__init__()
+
+        self.fc1 = nn.Linear(hidden_size, 256)
+        self.bn1 = nn.BatchNorm1d(256)
+
+        self.fc2 = nn.Linear(256, 256)
+        self.bn2 = nn.BatchNorm1d(256)
+
+        self.fc3 = nn.Linear(256, 256)
+        self.bn3 = nn.BatchNorm1d(256)
+
+        self.fc4 = nn.Linear(256, output_size)
+
+    def forward(self, x):
+        x1 = self.bn1(torch.relu(self.fc1(x)))
+        x2 = self.bn2(torch.relu(self.fc2(x1)))
+        x3 = self.bn3(torch.relu(self.fc3(x2)))
+        x4 = self.fc4(x3)
+        return x4
+
+
+class CVAE(nn.Module):
+    def __init__(self, input_size, output_size, hidden_size, condition_size):
+        super(CVAE, self).__init__()
+        self.encoder = CVAEEncoder(input_size - condition_size, hidden_size)
+        self.decoder = CVAEDecoder(output_size, hidden_size + condition_size)
+        self.condition_size = condition_size
+
+    def forward(self, x):
+        x, condition = x[:, :-self.condition_size], x[:, -self.condition_size:]
+        mean, logvar = self.encoder(x)
+        x = self.reparameterization(mean, torch.exp(0.5 * logvar))
+        x = torch.cat((x, condition), dim=1)
+        x = self.decoder(x)
+        return x, mean, logvar
+
+    def reparameterization(self, mean, var):
+        epsilon = torch.randn_like(var)
+        z = mean + var*epsilon
+        return z
+
+
+def loss_function(x, x_hat, mean, log_var):
+    reproduction_loss = nn.functional.mse_loss(x_hat, x)
+    KLD = - 0.5 * torch.mean(1 + log_var - mean.pow(2) - log_var.exp())
+
+    return reproduction_loss + KLD
 
 
 input_size = len(X_COLUMNS)
 output_size = len(Y_COLUMNS)
+condition_size = len(CONDITION_COLUMNS)
 device = get_device()
-net = Net(input_size, output_size).to(device)
+net = CVAE(input_size, output_size, 64, condition_size).to(device)
 
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(net.parameters(), lr=0.1)
@@ -91,8 +144,8 @@ for epoch in range(1000):
     for batch in tqdm(train_dataloader):
         x_batch, y_batch = batch
         optimizer.zero_grad()
-        output = net(x_batch)
-        loss = criterion(output, y_batch)
+        output, mean, logvar = net(x_batch)
+        loss = loss_function(y_batch, output, mean, logvar)
         loss.backward()
         optimizer.step()
 
@@ -100,7 +153,7 @@ for epoch in range(1000):
     test_loss = 0
     with torch.no_grad():
         for x_test, y_test in test_dataloader:
-            test_output = net(x_test)
+            test_output, _, _ = net(x_test)
             test_loss += criterion(test_output, y_test).item()
 
     # degrade learning rate
