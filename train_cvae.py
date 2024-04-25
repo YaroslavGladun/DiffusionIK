@@ -6,7 +6,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 
-from model import CVAE
+from cvae_model import CVAE
 
 X_COLUMNS = ["l0", "l1", "l2", "l3", "l4", "l5", "l6"]
 CONDITION_COLUMNS = ["px", "py", "pz"]
@@ -25,22 +25,21 @@ df = pd.read_csv('data.csv')
 x_data = df[X_COLUMNS].to_numpy()
 condition = df[CONDITION_COLUMNS].to_numpy()
 
-
 def loss_function(x, x_hat, mean, log_var):
     reproduction_loss = nn.functional.mse_loss(x_hat, x)
     KLD = - 0.5 * torch.mean(1 + log_var - mean.pow(2) - log_var.exp())
 
-    return reproduction_loss + KLD
+    return reproduction_loss + 0 * KLD
 
 
 input_size = len(X_COLUMNS)
 output_size = len(X_COLUMNS)
 condition_size = len(CONDITION_COLUMNS)
 device = get_device()
-net = CVAE(input_size, output_size, 2, condition_size).to(device)
+net = CVAE(device, input_size, output_size, 4, condition_size).to(device)
 
 criterion = nn.MSELoss()
-optimizer = torch.optim.Adam(net.parameters(), lr=0.1)
+optimizer = torch.optim.Adam(net.parameters(), lr=0.01)
 
 # Convert the data to PyTorch tensors and then to a dataset
 # pip install scikit-learn
@@ -84,9 +83,9 @@ for epoch in range(1, 10000 + 1):
             test_loss += criterion(test_output, x_test).item()
 
     # degrade learning rate
-    if epoch % 400 == 0:
-        for param_group in optimizer.param_groups:
-            param_group['lr'] = param_group['lr'] * 0.1
+    # if epoch % 400 == 0:
+    #     for param_group in optimizer.param_groups:
+    #         param_group['lr'] = param_group['lr'] * 0.1
 
     # checkpoint
     if epoch % 10 == 0:
