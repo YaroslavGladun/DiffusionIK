@@ -2,27 +2,6 @@ import torch.nn as nn
 import torch
 
 
-class JointValuesScaler(nn.Module):
-    def __init__(self, device):
-        super(JointValuesScaler, self).__init__()
-        self.joints_min = torch.tensor([-6.28, -2.059, -6.28, -0.19, -6.28, -1.69, -6.28]).to(device)
-        self.joints_max = torch.tensor([6.28, 2.09, 6.28, 3.92, 6.28, 3.14, 6.28]).to(device)
-
-    def forward(self, x):
-        return (x - self.joints_min) / (self.joints_max - self.joints_min)
-
-
-class JointValuesScalerInverse(nn.Module):
-
-    def __init__(self, device):
-        super(JointValuesScalerInverse, self).__init__()
-        self.joints_min = torch.tensor([-6.28, -2.059, -6.28, -0.19, -6.28, -1.69, -6.28]).to(device) - 0.01
-        self.joints_max = torch.tensor([6.28, 2.09, 6.28, 3.92, 6.28, 3.14, 6.28]).to(device) + 0.01
-
-    def forward(self, x):
-        return x * (self.joints_max - self.joints_min) + self.joints_min
-
-
 class CVAEEncoder(nn.Module):
     def __init__(self, input_size, hidden_size):
         super(CVAEEncoder, self).__init__()

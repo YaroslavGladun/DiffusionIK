@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from math import pi
 from typing import Tuple
+from torch.utils.data import Dataset, DataLoader
 
 JOINTS_LOWER_LIMIT = [-2.0 * pi, -2.059, -2.0 * pi, -0.19198, -2.0 * pi, -1.69297, -2.0 * pi]
 JOINTS_UPPER_LIMIT = [2.0 * pi, 2.0944, 2.0 * pi, 3.927, 2.0 * pi, pi, 2.0 * pi]
@@ -132,7 +133,7 @@ class FK(nn.Module):
         R_result = torch.eye(3, device=x.device).unsqueeze(0).expand(x.size(0), 3, 3)
         t_result = torch.zeros(x.size(0), 3, 1, device=x.device)
 
-        joint_rotations = TransformationUtility.rotation_z(x)  # 3x3 rotation matrices
+        joint_rotations = TransformationUtility.rotation_z(x)
 
         for i in range(7):
             R, t = self.joint_transforms[0][i], self.joint_transforms[1][i]
@@ -141,6 +142,22 @@ class FK(nn.Module):
             R_j = joint_rotations[:, i]
             R_result = torch.matmul(R_result, R_j)
 
-            # result = torch.matmul(result, joint_rotations[i].unsqueeze(0).expand(x.size(0), 4, 4))
-
         return R_result, t_result
+
+
+class RandomFKDataset(Dataset):
+    def __init__(self, device, batch_size, batch_count):
+        self.device = device
+        self.batch_size = batch_size
+        self.batch_count = batch_count
+        self.scaler = JointValuesScalerInverse(device)
+        self.fk = FK(device)
+
+    def __len__(self):
+        return self.batch_count * self.batch_size
+
+    def __getitem__(self, index):
+        joints = torch.rand(self.batch_size, 7, device=self.device)
+        joints = self.scaler(joints)
+        R, t = self.fk(joints)
+        return joints, R, t
