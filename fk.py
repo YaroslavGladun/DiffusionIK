@@ -112,6 +112,19 @@ class TransformationUtility:
         affine_matrices[:, 3, 3] = 1
         return affine_matrices
 
+    @staticmethod
+    def rotation_matrix_to_rpy(rotation: torch.Tensor) -> torch.Tensor:
+        """
+        Converts a tensor of rotation matrices to a tensor of rpy values
+        :param rotation: shape (N, 3, 3) tensor of rotation matrices
+        :return: shape (N, 3) tensor of rpy values
+        """
+        rpy = torch.zeros(rotation.shape[0], 3, device=rotation.device, dtype=rotation.dtype)
+        rpy[:, 0] = torch.atan2(rotation[:, 2, 1], rotation[:, 2, 2])
+        rpy[:, 1] = -torch.asin(rotation[:, 2, 0])
+        rpy[:, 2] = torch.atan2(rotation[:, 1, 0], rotation[:, 0, 0])
+        return rpy
+
 
 class FK(nn.Module):
     def __init__(self, device):
