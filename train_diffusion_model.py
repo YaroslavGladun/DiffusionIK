@@ -6,8 +6,8 @@ from torch.utils.data import TensorDataset, DataLoader
 from tqdm import tqdm
 from diffusion_model import DiffusionModel
 
-TIME_STEPS = 100
-BETA = 0.1
+TIME_STEPS = 1000
+BETA = 0.99
 BATCH_SIZE = 4096
 WINDOW_SIZE = 1
 
@@ -31,7 +31,7 @@ condition = df[CONDITION_COLUMNS].to_numpy()
 data_size = len(X_COLUMNS)
 condition_size = len(CONDITION_COLUMNS)
 device = get_device()
-net = DiffusionModel(data_size, condition_size).to(device)
+net = DiffusionModel(device, data_size, condition_size).to(device)
 
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(net.parameters(), lr=0.01)
@@ -51,7 +51,7 @@ for epoch in range(1, 100 + 1):
 
         batch_size = batch.size(0)
         step = torch.randint(1, TIME_STEPS, (batch_size, 1)).to(device)
-        noise = torch.randn_like(batch)
+        noise = torch.randn_like(batch).to(device)
         alpha_t = torch.pow(1 - BETA, step)
         alpha_t_last = torch.pow(1 - BETA, torch.max(step - WINDOW_SIZE, torch.zeros_like(step)))
         x = torch.sqrt(alpha_t) * batch + torch.sqrt(1 - alpha_t) * noise

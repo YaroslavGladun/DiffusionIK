@@ -1,11 +1,18 @@
 import torch.nn as nn
 import torch
+import math
+
+
+def d(x):
+    return x * math.pi / 180
 
 
 class JointValuesScaler(nn.Module):
     def __init__(self, device):
         super(JointValuesScaler, self).__init__()
-        self.joints_min = torch.tensor([-6.28, -2.059, -6.28, -0.19, -6.28, -1.69, -6.28]).to(device)
+        self.joints_min = torch.tensor([
+            d(-360),
+            ]).to(device)
         self.joints_max = torch.tensor([6.28, 2.09, 6.28, 3.92, 6.28, 3.14, 6.28]).to(device)
 
     def forward(self, x):
@@ -24,35 +31,26 @@ class JointValuesScalerInverse(nn.Module):
 
 
 class DiffusionModel(nn.Module):
+    LAYERS = 6
+    N_HIDDEN = 256
 
-    def __init__(self, data_size, condition_size):
+    def __init__(self, device, data_size, condition_size):
         super(DiffusionModel, self).__init__()
 
-        self.fc1 = nn.Linear(data_size + condition_size, 256)
-        # self.bn1 = nn.BatchNorm1d(256)
+        self.f0 = nn.Linear(data_size + condition_size, self.N_HIDDEN).to(device)
 
-        self.fc2 = nn.Linear(256, 256)
-        # self.bn2 = nn.BatchNorm1d(256)
+        self.f = []
+        for i in range(self.LAYERS):
+            self.f.append(nn.Linear(self.N_HIDDEN, self.N_HIDDEN).to(device))
 
-        self.fc3 = nn.Linear(256, 256)
-        # self.bn3 = nn.BatchNorm1d(256)
-
-        self.fc4 = nn.Linear(256, 256)
-        # self.bn4 = nn.BatchNorm1d(256)
-
-        self.f5 = nn.Linear(256, data_size)
+        self.f_out = nn.Linear(self.N_HIDDEN, data_size).to(device)
 
     def forward(self, x, condition):
         x = torch.cat((x, condition), 1)
-        # x1 = self.bn1(torch.relu(self.fc1(x)))
-        # x2 = self.bn2(torch.relu(self.fc2(x1)))
-        # x3 = self.bn3(torch.relu(self.fc3(x2 + x1)))
-        # x4 = self.bn4(torch.relu(self.fc4(x3 + x2)))
-        x1 = torch.relu(self.fc1(x))
-        x2 = torch.relu(self.fc2(x1))
-        x3 = torch.relu(self.fc3(x2 + x1))
-        x4 = torch.relu(self.fc4(x3 + x2))
 
-        x5 = self.f5(x3 + x4)
+        x = torch.relu(self.f0(x))
+        for i in range(self.LAYERS):
+            x = torch.relu(self.f[i](x))
+        x = self.f_out(x)
 
-        return x5
+        return x
