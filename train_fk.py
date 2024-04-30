@@ -31,55 +31,72 @@ from affine_loss import AffineLoss
 # Average test rotation loss for Epoch 156: 0.0113
 # Average test translation loss for Epoch 156: 0.0044
 
+# With skip connections
+# Average test loss for Epoch 184: 0.0127
+# Average test rotation loss for Epoch 184: 0.0090
+# Average test translation loss for Epoch 184: 0.0037
+
 class Model(nn.Module):
     def __init__(self, device, d_model=128):
+        assert d_model % 2 == 0
+
         super(Model, self).__init__()
         self.device = device
 
-        self.fc1 = nn.Linear(14, d_model)
-        self.bn1 = nn.BatchNorm1d(d_model)
+        d_model_half = int(d_model // 2)
 
-        self.fc2 = nn.Linear(d_model, d_model)
-        self.bn2 = nn.BatchNorm1d(d_model)
+        self.fc1 = nn.Linear(14, d_model_half)
+        self.bn1 = nn.BatchNorm1d(d_model_half)
 
-        self.fc3 = nn.Linear(d_model, d_model)
-        self.bn3 = nn.BatchNorm1d(d_model)
+        self.fc2 = nn.Linear(d_model_half, d_model_half)
+        self.bn2 = nn.BatchNorm1d(d_model_half)
 
-        self.fc4 = nn.Linear(d_model, d_model)
-        self.bn4 = nn.BatchNorm1d(d_model)
+        self.fc3 = nn.Linear(d_model, d_model_half)
+        self.bn3 = nn.BatchNorm1d(d_model_half)
 
-        self.fc5 = nn.Linear(d_model, d_model)
-        self.bn5 = nn.BatchNorm1d(d_model)
+        self.fc4 = nn.Linear(d_model, d_model_half)
+        self.bn4 = nn.BatchNorm1d(d_model_half)
 
-        self.fc6 = nn.Linear(d_model, d_model)
-        self.bn6 = nn.BatchNorm1d(d_model)
+        self.fc5 = nn.Linear(d_model, d_model_half)
+        self.bn5 = nn.BatchNorm1d(d_model_half)
 
-        self.fc7 = nn.Linear(d_model, d_model)
-        self.bn7 = nn.BatchNorm1d(d_model)
+        self.fc6 = nn.Linear(d_model, d_model_half)
+        self.bn6 = nn.BatchNorm1d(d_model_half)
 
-        self.fc8 = nn.Linear(d_model, d_model)
-        self.bn8 = nn.BatchNorm1d(d_model)
+        self.fc7 = nn.Linear(d_model, d_model_half)
+        self.bn7 = nn.BatchNorm1d(d_model_half)
 
-        self.fc_position = nn.Linear(d_model, 3)
-        self.fc_rotation_x = nn.Linear(d_model, 3)
-        self.fc_rotation_y = nn.Linear(d_model, 3)
+        self.fc8 = nn.Linear(d_model, d_model_half)
+        self.bn8 = nn.BatchNorm1d(d_model_half)
+
+        self.fc_position = nn.Linear(d_model_half, 3)
+        self.fc_rotation_x = nn.Linear(d_model_half, 3)
+        self.fc_rotation_y = nn.Linear(d_model_half, 3)
 
         self.activation = nn.SiLU()
         self.sin_cos_activation = nn.Tanh()
 
     def forward(self, x):
-        # x = self.scaler(x)
         x_cos = torch.cos(x)
         x_sin = torch.sin(x)
         x = torch.cat((x_cos, x_sin), dim=1)
+
         x1 = self.bn1(self.activation(self.fc1(x)))
+
         x2 = self.bn2(self.activation(self.fc2(x1)))
-        x3 = self.bn3(self.activation(self.fc3(x2)))
-        x4 = self.bn4(self.activation(self.fc4(x3)))
-        x5 = self.bn5(self.activation(self.fc5(x4)))
-        x6 = self.bn6(self.activation(self.fc6(x5)))
-        x7 = self.bn7(self.activation(self.fc7(x6)))
-        x8 = self.bn8(self.activation(self.fc8(x7)))
+
+        x3 = self.bn3(self.activation(self.fc3(torch.cat((x1, x2), dim=1))))
+
+        x4 = self.bn4(self.activation(self.fc4(torch.cat((x2, x3), dim=1))))
+
+        x5 = self.bn5(self.activation(self.fc5(torch.cat((x3, x4), dim=1))))
+
+        x6 = self.bn6(self.activation(self.fc6(torch.cat((x4, x5), dim=1))))
+
+        x7 = self.bn7(self.activation(self.fc7(torch.cat((x5, x6), dim=1))))
+
+        x8 = self.bn8(self.activation(self.fc8(torch.cat((x6, x7), dim=1))))
+
         xyz = self.fc_position(x8)
         rpy_cos = self.sin_cos_activation(self.fc_rotation_x(x8))
         rpy_sin = self.sin_cos_activation(self.fc_rotation_y(x8))
