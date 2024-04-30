@@ -24,23 +24,32 @@ class Model(nn.Module):
 
         self.scaler = JointValuesScaler(device)
 
-        self.fc1 = nn.Linear(7, 256)  # Input layer
-        self.bn1 = nn.BatchNorm1d(256)
+        self.fc1 = nn.Linear(14, 128)  # Input layer
+        self.bn1 = nn.BatchNorm1d(128)
 
-        self.fc2 = nn.Linear(256, 256)  # Hidden layer 1
-        self.bn2 = nn.BatchNorm1d(256)
+        self.fc2 = nn.Linear(128, 128)  # Hidden layer 1
+        self.bn2 = nn.BatchNorm1d(128)
 
-        self.fc3 = nn.Linear(256, 256)  # Hidden layer 2
-        self.bn3 = nn.BatchNorm1d(256)
+        self.fc3 = nn.Linear(128, 128)
+        self.bn3 = nn.BatchNorm1d(128)
 
-        self.fc4 = nn.Linear(256, 256)  # Hidden layer 3
-        self.bn4 = nn.BatchNorm1d(256)
+        self.fc4 = nn.Linear(128, 128)
+        self.bn4 = nn.BatchNorm1d(128)
 
-        self.fc5 = nn.Linear(256, 256)  # Hidden layer 4
-        self.bn5 = nn.BatchNorm1d(256)
+        self.fc5 = nn.Linear(128, 128)
+        self.bn5 = nn.BatchNorm1d(128)
 
-        self.fc_position = nn.Linear(256, 3)
-        self.fc_rotation = nn.Linear(256, 3)
+        self.fc6 = nn.Linear(128, 128)
+        self.bn6 = nn.BatchNorm1d(128)
+
+        self.fc7 = nn.Linear(128, 128)
+        self.bn7 = nn.BatchNorm1d(128)
+
+        self.fc8 = nn.Linear(128, 128)
+        self.bn8 = nn.BatchNorm1d(128)
+
+        self.fc_position = nn.Linear(128, 3)
+        self.fc_rotation = nn.Linear(128, 3)
 
         self.relu = nn.ReLU()
         self.tanh = nn.Tanh()
@@ -48,14 +57,20 @@ class Model(nn.Module):
         self.rpy_multiplier = torch.tensor([np.pi, np.pi / 2, np.pi], device=device)
 
     def forward(self, x):
-        x = self.scaler(x)
+        # x = self.scaler(x)
+        x_cos = torch.cos(x)
+        x_sin = torch.sin(x)
+        x = torch.cat((x_cos, x_sin), dim=1)
         x1 = self.bn1(self.relu(self.fc1(x)))
         x2 = self.bn2(self.relu(self.fc2(x1)))
         x3 = self.bn3(self.relu(self.fc3(x2)))
         x4 = self.bn4(self.relu(self.fc4(x3)))
         x5 = self.bn5(self.relu(self.fc5(x4)))
-        xyz = self.fc_position(x5)
-        rpy = self.fc_rotation(x5)
+        x6 = self.bn6(self.relu(self.fc6(x5)))
+        x7 = self.bn7(self.relu(self.fc7(x6)))
+        x8 = self.bn8(self.relu(self.fc8(x7)))
+        xyz = self.fc_position(x8)
+        rpy = self.fc_rotation(x8)
         # rpy = self.rpy_multiplier * self.tanh(rpy)
         # reshape to 3x3
         # R = R.view(-1, 3, 3)
