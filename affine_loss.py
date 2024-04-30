@@ -26,12 +26,7 @@ class AffineLoss(nn.Module):
         t_loss = torch.sqrt(torch.sum(torch.square(t_pred - t_target), dim=-1))
         t_loss = torch.mean(t_loss, dim=0)
 
-        # print(R_pred[0], R_target[0])
-        # exit(0)
         R_loss = torch.sqrt(torch.sum(torch.square(R_pred - R_target), dim=-1))
         R_loss = torch.mean(R_loss, dim=(0, 1))
-        # R_loss = torch.matmul(R_target.transpose(1, 2), R_pred) - torch.eye(3, device=R_pred.device)
-        # R_loss = torch.sqrt(torch.sum(torch.square(R_loss), dim=-1))
-        # R_loss = torch.mean(R_loss, dim=(0, 1))
 
         return self.alpha * R_loss + self.beta * t_loss
