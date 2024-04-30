@@ -4,7 +4,7 @@ import torch
 
 from torch.utils.data import TensorDataset, DataLoader
 from tqdm import tqdm
-from diffusion_model import DiffusionModel
+from diffusion_ik import DiffusionModel
 
 TIME_STEPS = 1000
 BETA = 0.99

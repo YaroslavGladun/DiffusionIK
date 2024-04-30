@@ -1,6 +1,6 @@
 from tqdm import tqdm
 import torch
-from diffusion_model import DiffusionModel
+from diffusion_ik import DiffusionModel
 
 device = torch.device('cpu')
 
