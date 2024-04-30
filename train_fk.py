@@ -1,8 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from fk import RandomFKDataset, TransformationUtility, JointValuesScaler
-from torch.utils.data import DataLoader
+from fk import RandomFKDataset, TransformationUtility
 from tqdm import tqdm
 from affine_loss import AffineLoss
 
@@ -27,12 +26,15 @@ from affine_loss import AffineLoss
 # Average test rotation loss for Epoch 200: 0.0186
 # Average test translation loss for Epoch 200: 0.0054
 
+# Use Tanh activation function and atan2 for rotation
+# Average test loss for Epoch 156: 0.0157
+# Average test rotation loss for Epoch 156: 0.0113
+# Average test translation loss for Epoch 156: 0.0044
+
 class Model(nn.Module):
     def __init__(self, device, d_model=128):
         super(Model, self).__init__()
         self.device = device
-
-        self.scaler = JointValuesScaler(device)
 
         self.fc1 = nn.Linear(14, d_model)
         self.bn1 = nn.BatchNorm1d(d_model)
@@ -59,11 +61,11 @@ class Model(nn.Module):
         self.bn8 = nn.BatchNorm1d(d_model)
 
         self.fc_position = nn.Linear(d_model, 3)
-        self.fc_rotation = nn.Linear(d_model, 3)
+        self.fc_rotation_x = nn.Linear(d_model, 3)
+        self.fc_rotation_y = nn.Linear(d_model, 3)
 
         self.activation = nn.SiLU()
-
-        self.rpy_multiplier = torch.tensor([np.pi, np.pi / 2, np.pi], device=device)
+        self.sin_cos_activation = nn.Tanh()
 
     def forward(self, x):
         # x = self.scaler(x)
@@ -79,14 +81,9 @@ class Model(nn.Module):
         x7 = self.bn7(self.activation(self.fc7(x6)))
         x8 = self.bn8(self.activation(self.fc8(x7)))
         xyz = self.fc_position(x8)
-        rpy = self.fc_rotation(x8)
-        # rpy = self.rpy_multiplier * self.tanh(rpy)
-        # reshape to 3x3
-        # R = R.view(-1, 3, 3)
-        # scale rpy to be between (-pi, -pi/2, -pi) and (pi, pi/2, pi)
-        # rpy[..., 0] = torch.pi * rpy[..., 0]
-        # rpy[..., 1] = torch.pi * rpy[..., 1]
-        # rpy[..., 2] = torch.pi * rpy[..., 2]
+        rpy_cos = self.sin_cos_activation(self.fc_rotation_x(x8))
+        rpy_sin = self.sin_cos_activation(self.fc_rotation_y(x8))
+        rpy = torch.atan2(rpy_sin, rpy_cos)
         x = torch.cat((xyz, rpy), dim=1)
 
         R, t = TransformationUtility.xyz_rpy_to_torch_affine(x)
