@@ -17,42 +17,51 @@ from affine_loss import AffineLoss
 # Average test translation loss for Epoch 20: 0.0423
 # Learning rate: 0.000920
 
+# Use ELU activation function
+# Average test loss for Epoch 199: 0.0562
+# Average test rotation loss for Epoch 199: 0.0438
+# Average test translation loss for Epoch 199: 0.0124
+
+# Use SiLU activation function
+# Average test loss for Epoch 200: 0.0240
+# Average test rotation loss for Epoch 200: 0.0186
+# Average test translation loss for Epoch 200: 0.0054
+
 class Model(nn.Module):
-    def __init__(self, device):
+    def __init__(self, device, d_model=128):
         super(Model, self).__init__()
         self.device = device
 
         self.scaler = JointValuesScaler(device)
 
-        self.fc1 = nn.Linear(14, 128)  # Input layer
-        self.bn1 = nn.BatchNorm1d(128)
+        self.fc1 = nn.Linear(14, d_model)
+        self.bn1 = nn.BatchNorm1d(d_model)
 
-        self.fc2 = nn.Linear(128, 128)  # Hidden layer 1
-        self.bn2 = nn.BatchNorm1d(128)
+        self.fc2 = nn.Linear(d_model, d_model)
+        self.bn2 = nn.BatchNorm1d(d_model)
 
-        self.fc3 = nn.Linear(128, 128)
-        self.bn3 = nn.BatchNorm1d(128)
+        self.fc3 = nn.Linear(d_model, d_model)
+        self.bn3 = nn.BatchNorm1d(d_model)
 
-        self.fc4 = nn.Linear(128, 128)
-        self.bn4 = nn.BatchNorm1d(128)
+        self.fc4 = nn.Linear(d_model, d_model)
+        self.bn4 = nn.BatchNorm1d(d_model)
 
-        self.fc5 = nn.Linear(128, 128)
-        self.bn5 = nn.BatchNorm1d(128)
+        self.fc5 = nn.Linear(d_model, d_model)
+        self.bn5 = nn.BatchNorm1d(d_model)
 
-        self.fc6 = nn.Linear(128, 128)
-        self.bn6 = nn.BatchNorm1d(128)
+        self.fc6 = nn.Linear(d_model, d_model)
+        self.bn6 = nn.BatchNorm1d(d_model)
 
-        self.fc7 = nn.Linear(128, 128)
-        self.bn7 = nn.BatchNorm1d(128)
+        self.fc7 = nn.Linear(d_model, d_model)
+        self.bn7 = nn.BatchNorm1d(d_model)
 
-        self.fc8 = nn.Linear(128, 128)
-        self.bn8 = nn.BatchNorm1d(128)
+        self.fc8 = nn.Linear(d_model, d_model)
+        self.bn8 = nn.BatchNorm1d(d_model)
 
-        self.fc_position = nn.Linear(128, 3)
-        self.fc_rotation = nn.Linear(128, 3)
+        self.fc_position = nn.Linear(d_model, 3)
+        self.fc_rotation = nn.Linear(d_model, 3)
 
-        self.relu = nn.ReLU()
-        self.tanh = nn.Tanh()
+        self.activation = nn.SiLU()
 
         self.rpy_multiplier = torch.tensor([np.pi, np.pi / 2, np.pi], device=device)
 
@@ -61,14 +70,14 @@ class Model(nn.Module):
         x_cos = torch.cos(x)
         x_sin = torch.sin(x)
         x = torch.cat((x_cos, x_sin), dim=1)
-        x1 = self.bn1(self.relu(self.fc1(x)))
-        x2 = self.bn2(self.relu(self.fc2(x1)))
-        x3 = self.bn3(self.relu(self.fc3(x2)))
-        x4 = self.bn4(self.relu(self.fc4(x3)))
-        x5 = self.bn5(self.relu(self.fc5(x4)))
-        x6 = self.bn6(self.relu(self.fc6(x5)))
-        x7 = self.bn7(self.relu(self.fc7(x6)))
-        x8 = self.bn8(self.relu(self.fc8(x7)))
+        x1 = self.bn1(self.activation(self.fc1(x)))
+        x2 = self.bn2(self.activation(self.fc2(x1)))
+        x3 = self.bn3(self.activation(self.fc3(x2)))
+        x4 = self.bn4(self.activation(self.fc4(x3)))
+        x5 = self.bn5(self.activation(self.fc5(x4)))
+        x6 = self.bn6(self.activation(self.fc6(x5)))
+        x7 = self.bn7(self.activation(self.fc7(x6)))
+        x8 = self.bn8(self.activation(self.fc8(x7)))
         xyz = self.fc_position(x8)
         rpy = self.fc_rotation(x8)
         # rpy = self.rpy_multiplier * self.tanh(rpy)
@@ -93,14 +102,14 @@ loss_fn = AffineLoss(alpha=1.0, beta=1.0)
 loss_rotation_fn = AffineLoss(alpha=1.0, beta=0.0)
 loss_translation_fn = AffineLoss(alpha=0.0, beta=1.0)
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-lr_space = np.linspace(1e-3, 2 * 1e-4, 200)
+lr_space = np.linspace(1e-3, 2 * 1e-5, 200)
 
 # Dataset
-train_dataset = RandomFKDataset(device, 10000, 500)
+train_dataset = RandomFKDataset(device, 10000, 2000)
 test_dataset = RandomFKDataset(device, 10000, 100)
 
 # Training and testing loops
-for epoch in range(1, 200):
+for epoch in range(1, len(lr_space) + 1):
     lr = lr_space[epoch - 1]
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
