@@ -9,7 +9,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 loss_fn = nn.MSELoss()
 diffusion_model = DiffusionModel(device, 1000, 1e-4, 0.02)
 dataset = RandomDiffusionIKDataset(device, 10000, 2000, diffusion_model)
-model = Model(device, diffusion_model, 512).to(device)
+model = Model(device, diffusion_model, 128).to(device)
 optimizer = torch.optim.Adam(model.parameters(), 1e-3)
 
 for epoch in range(100):

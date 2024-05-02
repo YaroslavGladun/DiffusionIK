@@ -13,14 +13,18 @@ from typing import Tuple
 
 class DiffusionModel:
 
-    def __init__(self, device, diffusion_steps=1000, beta_small=1e-4, beta_large=0.02):
+    def __init__(self, device, diffusion_steps=1000, beta_small=1e-4, beta_large=0.01):
         self.device = device
         self.diffusion_steps = diffusion_steps
         self.beta_small = beta_small
         self.beta_large = beta_large
 
-        betas = torch.linspace(beta_small, beta_large, self.diffusion_steps, device=device)
-        alphas = 1.0 - betas
+        # Cosine annealing for beta values
+        timesteps = torch.arange(diffusion_steps, device=device)
+        self.betas = self.beta_small + (self.beta_large - self.beta_small) * \
+                     (1 - torch.cos(timesteps / diffusion_steps * torch.pi)) / 2
+
+        alphas = 1.0 - self.betas
         self.alphas_cumprod = torch.cumprod(alphas, 0).unsqueeze(-1)
 
         print(f"Min alpha: {self.alphas_cumprod.min()}")

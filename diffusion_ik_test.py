@@ -9,7 +9,7 @@ from fk import *
 class DiffusionModelTest(unittest.TestCase):
 
     def test_alpha(self):
-        diffusion_model = DiffusionModel('cpu', 1000, 1e-4, 0.02)
+        diffusion_model = DiffusionModel('cpu', 1000, 1e-4, 0.01)
         plt.plot(diffusion_model.alphas_cumprod)
         plt.show()
 
