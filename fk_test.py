@@ -3,12 +3,6 @@ import unittest
 from fk import *
 
 
-class TransformationUtilityTest(unittest.TestCase):
-
-    def test_xyz_rpy_to_torch_affine(self):
-        pass
-
-
 class FKTest(unittest.TestCase):
     def test_zero_state(self):
         fk = FK('cpu')
