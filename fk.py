@@ -21,7 +21,7 @@ class FK(nn.Module):
 
         self.joint_transforms = TransformationUtility.xyz_rpy_to_torch_affine(transformations)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         R_result = torch.eye(3, device=x.device).unsqueeze(0).expand(x.size(0), 3, 3)
         t_result = torch.zeros(x.size(0), 3, 1, device=x.device)
 
