@@ -120,7 +120,19 @@ class Model(nn.Module):
 
 # Setup device and model
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = Model(device).to(device)
+model = Model(device, 2048).to(device)
+model.load_state_dict(torch.load('model_2048.pth'))
+model.eval()
+R, t = TransformationUtility.xyz_rpy_to_torch_affine(torch.Tensor([[0.254067, -0.0196514, 0.679887, -1.69461, -1.57533, 1.69438]]).to(device))
+R = R.view(-1, 9)
+t = t.view(-1, 3)
+j = torch.Tensor([[2]]).to(device)
+x = torch.cat([j, R, t], dim=-1)
+torch.onnx.export(model, x, 'model_2048.onnx', verbose=True)
+y = model(x)
+print(y)
+
+exit(0)
 
 # Loss function and optimizer
 loss_fn = IK6DOFLoss(device)
