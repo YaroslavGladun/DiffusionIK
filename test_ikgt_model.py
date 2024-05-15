@@ -1,7 +1,7 @@
 import unittest
 import torch
 import numpy as np
-from ikgt_model import IndexMapper, OneHotEncoder, IKGTModel
+from seed_epsilon_ik_model import IndexMapper, OneHotEncoder, IKGTModel
 
 
 class TestIndexMapper(unittest.TestCase):
