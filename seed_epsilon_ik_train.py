@@ -7,22 +7,21 @@ from fk import FK
 from common import TransformationUtility
 from seed_epsilon_ik_model import SeedEpsilonIKModel
 from seed_epsilon_ik_dataset import SeedEpsilonIKDataset
-from affine_loss import AffineLoss
+from seed_epsilon_ik_loss import SeedEpsilonIKLoss
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Device: {device}")
-model = SeedEpsilonIKModel(2048).to(device)
+model = SeedEpsilonIKModel(512).to(device)
 # model.load_state_dict(torch.load("seed_epsilon_ik_model.pth", map_location=device))
-loss_fn = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
 lr_space = np.linspace(1e-3, 2 * 1e-5, 500)
 
-dataset = SeedEpsilonIKDataset(device, 4 * 2048, 1)
+dataset = SeedEpsilonIKDataset(device, 2048, 1000)
 test_dataset = SeedEpsilonIKDataset(device, 2048, 1)
 
 fk = FK(device)
-affine_loss = AffineLoss(alpha=1.0, beta=1.0)
+loss_fn = SeedEpsilonIKLoss(device)
 
 for epoch in range(len(lr_space)):
     model.train()
@@ -30,7 +29,7 @@ for epoch in range(len(lr_space)):
     train_loss_accum = 0
 
     lr = lr_space[epoch]
-    lr = 1e-5
+    lr = 1e-4
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
         print(f"Learning rate: {lr:.6f}")
@@ -43,7 +42,13 @@ for epoch in range(len(lr_space)):
         pred_joints = model(pose, seed, epsilon)
         pred_pose_R, pred_pose_t = fk(pred_joints)
         pose_R, pose_t = pose[:, :9].view(-1, 3, 3), pose[:, 9:].view(-1, 3)
-        loss = affine_loss((pose_R, pose_t), (pred_pose_R, pred_pose_t))
+        loss = loss_fn(
+            (pred_pose_R, pred_pose_t),
+            (pose_R, pose_t),
+            pred_joints,
+            seed,
+            epsilon
+        )
         loss.backward()
         optimizer.step()
 
@@ -61,7 +66,13 @@ for epoch in range(len(lr_space)):
             pred_joints = model(pose, seed, epsilon)
             pred_pose_R, pred_pose_t = fk(pred_joints)
             pose_R, pose_t = pose[:, :9].view(-1, 3, 3), pose[:, 9:].view(-1, 3)
-            loss = affine_loss((pose_R, pose_t), (pred_pose_R, pred_pose_t))
+            loss = loss_fn(
+                (pred_pose_R, pred_pose_t),
+                (pose_R, pose_t),
+                pred_joints,
+                seed,
+                epsilon
+            )
             test_loss_accum += loss.item()
 
         avg_test_loss = test_loss_accum / test_dataset.batch_count
