@@ -44,14 +44,14 @@ class SeedEpsilonIKModel(nn.Module):
 
         self.activation = nn.SiLU()
 
-    def forward(self, pose, seed, epsilon) -> torch.Tensor:
+    def forward(self, pose, seed, cosine_diff) -> torch.Tensor:
         """
         :param pose: shape (batch_size, 12)
         :param seed: shape (batch_size, 7)
-        :param epsilon: shape (batch_size, 1)
+        :param cosine_diff: shape (batch_size, 1)
         :return: 7 joints of xArm
         """
-        x0 = torch.cat((pose, torch.cos(seed), torch.sin(seed), epsilon), dim=1)
+        x0 = torch.cat((pose, torch.cos(seed), torch.sin(seed), cosine_diff), dim=1)
         x1 = self.bn1(self.activation(self.fc1(x0)))
         x2 = self.bn2(self.activation(self.fc2(x1)))
         x3 = self.bn3(self.activation(self.fc3(x1 + x2)))

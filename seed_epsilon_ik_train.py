@@ -12,10 +12,11 @@ from seed_epsilon_ik_loss import SeedEpsilonIKLoss
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Device: {device}")
 model = SeedEpsilonIKModel(512).to(device)
+model.load_state_dict(torch.load("seed_epsilon_ik_model_512_200.pth", map_location=device))
 # model.load_state_dict(torch.load("seed_epsilon_ik_model.pth", map_location=device))
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-lr_space = np.linspace(1e-3, 2 * 1e-5, 500)
+lr_space = np.linspace(1e-3, 2 * 1e-5, 2000)
 
 dataset = SeedEpsilonIKDataset(device, 2048, 1000)
 test_dataset = SeedEpsilonIKDataset(device, 2048, 1)
@@ -29,7 +30,7 @@ for epoch in range(len(lr_space)):
     train_loss_accum = 0
 
     lr = lr_space[epoch]
-    lr = 1e-4
+    lr = 1e-5
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
         print(f"Learning rate: {lr:.6f}")
@@ -77,3 +78,8 @@ for epoch in range(len(lr_space)):
 
         avg_test_loss = test_loss_accum / test_dataset.batch_count
         print(f"Epoch {epoch} - Average testing loss: {avg_test_loss:.4f}")
+
+    if epoch % 100 == 0:
+        torch.save(model.state_dict(), f"seed_epsilon_ik_model_512_{epoch}.pth")
+
+torch.save(model.state_dict(), "seed_epsilon_ik_model_512.pth")
