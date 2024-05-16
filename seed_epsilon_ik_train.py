@@ -12,7 +12,7 @@ from affine_loss import AffineLoss
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Device: {device}")
 model = SeedEpsilonIKModel(2048).to(device)
-model.load_state_dict(torch.load("seed_epsilon_ik_model.pth", map_location=device))
+# model.load_state_dict(torch.load("seed_epsilon_ik_model.pth", map_location=device))
 loss_fn = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 

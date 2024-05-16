@@ -29,8 +29,10 @@ class SeedEpsilonIKDataset(Dataset):
         target_pose_R, target_pose_t = self.fk(target_joints)
         target_pose = torch.cat([target_pose_R.view(-1, 9), target_pose_t.view(-1, 3)], dim=-1)
         epsilon_lower = 0.01
-        epsilon_upper = torch.pi
+        epsilon_upper = torch.pi / 4
         epsilon = torch.rand(self.batch_size, 1, device=self.device) * (epsilon_upper - epsilon_lower) + epsilon_lower
         noise = (2 * torch.rand(self.batch_size, 7, device=self.device) - 1) * epsilon
         seed_joints = target_joints + noise
+        seed_joints = torch.max(torch.min(seed_joints, torch.tensor([torch.pi] * 7, device=self.device)),
+                                torch.tensor([-torch.pi] * 7, device=self.device))
         return target_pose, seed_joints, epsilon
