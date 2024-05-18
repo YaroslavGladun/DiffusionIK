@@ -21,6 +21,14 @@ class SeedEpsilonIKLoss(nn.Module):
             target_cosine_diff: torch.Tensor
     ):
         affine_loss = self.affine_loss(pred_pose, target_pose)
-        pred_cosine_diff = torch.mean(torch.cos(pred_joints - seed_joints))
-        seed_loss = torch.mean(torch.relu(pred_cosine_diff - target_cosine_diff))
+        seed_loss = self.get_seed_loss(pred_joints, seed_joints, target_cosine_diff)
         return affine_loss + seed_loss
+
+    def get_affine_loss(self, pred_pose: Tuple[torch.Tensor, torch.Tensor],
+                        target_pose: Tuple[torch.Tensor, torch.Tensor]):
+        return self.affine_loss(pred_pose, target_pose)
+
+    def get_seed_loss(self, pred_joints, seed_joints: torch.Tensor, target_diff: torch.Tensor):
+        pred_diff = torch.sqrt(torch.sum(torch.pow(pred_joints - seed_joints, 2), dim=-1, keepdim=True))
+        seed_loss = torch.mean(torch.relu(pred_diff - target_diff))
+        return seed_loss
