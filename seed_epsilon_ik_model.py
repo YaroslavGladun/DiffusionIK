@@ -12,13 +12,16 @@ from affine_loss import AffineLoss
 
 class SeedEpsilonIKEncoder(nn.Module):
 
-    def __init__(self, d_model=128, n_layers=6):
+    def __init__(self, device, d_model=128, n_layers=6):
         super(SeedEpsilonIKEncoder, self).__init__()
+
+        self.fk = FK(device)
 
         self.d_model = d_model
         self.n_layers = n_layers
 
-        self.fc1 = nn.Linear(12 + 7, d_model)
+        # pose, joints, joints_cos, joints_sin, seed_pose
+        self.fc1 = nn.Linear(12 + 7 + 7 + 7 + 12, d_model)
         self.bn1 = nn.BatchNorm1d(d_model)
 
         self.fc2 = nn.Linear(d_model, d_model)
@@ -44,7 +47,11 @@ class SeedEpsilonIKEncoder(nn.Module):
         :param seed: shape (batch_size, 7)
         :return: 7 joints of xArm
         """
-        x = torch.cat((pose, seed), dim=1)
+        seed_cos = torch.cos(seed)
+        seed_sin = torch.sin(seed)
+        seed_R, seed_t = self.fk(seed)
+        seed_pose = torch.cat([seed_R.view(-1, 9), seed_t.view(-1, 3)], dim=-1)
+        x = torch.cat((pose, seed, seed_cos, seed_sin, seed_pose), dim=1)
         x1 = self.bn1(self.activation(self.fc1(x)))
         x2 = self.bn2(self.activation(self.fc2(x1)))
         x3 = self.bn3(self.activation(self.fc3(x1 + x2)))
@@ -56,10 +63,10 @@ class SeedEpsilonIKEncoder(nn.Module):
 
 
 class SeedEpsilonIKModel(nn.Module):
-    def __init__(self, d_model=128, n_encoder_layers=6):
+    def __init__(self, device, d_model=128, n_encoder_layers=6):
         super(SeedEpsilonIKModel, self).__init__()
 
-        self.encoder = SeedEpsilonIKEncoder(d_model=d_model, n_layers=n_encoder_layers)
+        self.encoder = SeedEpsilonIKEncoder(device, d_model=d_model, n_layers=n_encoder_layers)
 
         # pose, joint_cos, joint_sin, epsilon
         self.fc1 = nn.Linear(d_model + 1, d_model)

@@ -11,7 +11,7 @@ from seed_epsilon_ik_loss import SeedEpsilonIKLoss
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Device: {device}")
-model = SeedEpsilonIKModel(512).to(device)
+model = SeedEpsilonIKModel(device, 512).to(device)
 # model.load_state_dict(torch.load("seed_epsilon_ik_model_512_200.pth", map_location=device))
 # model.load_state_dict(torch.load("seed_epsilon_ik_model.pth", map_location=device))
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
@@ -88,10 +88,7 @@ while True:
         print(f"Epoch {epoch} - Average testing seed loss: {avg_test_seed_loss:.4f}")
 
         epoch += 1
-        if avg_test_loss < 0.01 and dataset.seed_std < np.pi / 360:
-            dataset.seed_std += np.pi / 16
-            print(f"Seed std: {dataset.seed_std:.4f}")
-        elif avg_test_loss < 0.01:
+        if avg_test_loss < 0.01 or epoch > 10:
             print(f"Seed std: {dataset.seed_std:.4f}")
             break
 
