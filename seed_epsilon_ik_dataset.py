@@ -13,7 +13,7 @@ class SeedEpsilonIKDataset(Dataset):
         self.batch_count = batch_count
         self.scaler = JointValuesScalerInverse(device)
         self.fk = FK(device)
-        self.seed_std = torch.pi / 6
+        self.seed_std = torch.pi / 4
 
     def __len__(self):
         return self.batch_count * self.batch_size

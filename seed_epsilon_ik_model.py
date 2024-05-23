@@ -108,5 +108,6 @@ class SeedEpsilonIKModel(nn.Module):
         x6 = self.bn6(self.activation(self.fc6(torch.cat((x4 + x5, angle_diff), dim=1))))
 
         x = self.fc_out(torch.cat((x5 + x6, angle_diff), dim=1))
+        x = x / torch.norm(x, dim=-1, keepdim=True)
 
-        return x + seed
+        return seed + angle_diff * x
