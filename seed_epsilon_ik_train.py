@@ -8,15 +8,17 @@ from common import TransformationUtility
 from seed_epsilon_ik_model import SeedEpsilonIKModel
 from seed_epsilon_ik_dataset import SeedEpsilonIKDataset
 from seed_epsilon_ik_loss import SeedEpsilonIKLoss
+from seed_epsilon_ik_config import SeedEpsilonIKConfig
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Device: {device}")
-model = SeedEpsilonIKModel(device, 512).to(device)
+config = SeedEpsilonIKConfig()
+model = SeedEpsilonIKModel(device, config).to(device)
 # model.load_state_dict(torch.load("seed_epsilon_ik_model_512_200.pth", map_location=device))
 # model.load_state_dict(torch.load("seed_epsilon_ik_model.pth", map_location=device))
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-dataset = SeedEpsilonIKDataset(device, 8 * 2048, 10000)
+dataset = SeedEpsilonIKDataset(device, 8 * 2048, 1000)
 test_dataset = SeedEpsilonIKDataset(device, 8 * 2048, 10)
 
 fk = FK(device)
@@ -29,8 +31,8 @@ while True:
 
     train_loss_accum = 0
 
-    test_dataset.seed_std = dataset.seed_std
-    print(f"Seed std: {dataset.seed_std:.4f}")
+    test_dataset.max_seed_dist = dataset.max_seed_dist
+    print(f"Seed std: {dataset.max_seed_dist:.4f}")
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
         print(f"Learning rate: {lr:.6f}")
@@ -88,11 +90,16 @@ while True:
         print(f"Epoch {epoch} - Average testing seed loss: {avg_test_seed_loss:.4f}")
 
         epoch += 1
-        if avg_test_loss < 0.01 or epoch > 10:
-            print(f"Seed std: {dataset.seed_std:.4f}")
-            break
 
-    if epoch % 10 == 0:
-        torch.save(model.state_dict(), f"/content/drive/MyDrive/DiffusionIK/seed_epsilon_ik_model_2048_{epoch}.pth")
+    # if epoch % 10 == 0:
+    #     torch.save(model.state_dict(), f"/content/drive/MyDrive/DiffusionIK/seed_epsilon_ik_model_2048_{epoch}.pth")
 
 torch.save(model.state_dict(), "/content/drive/MyDrive/DiffusionIK/seed_epsilon_ik_model_2048_final.pth")
+
+
+# Epoch 6 - Average training loss: 0.0309
+# Epoch 6 - Average testing loss: 0.0288
+# Epoch 6 - Average testing affine loss: 0.0288
+# Epoch 6 - Average testing seed loss: 0.0446
+# Seed std: 0.5236
+# Learning rate: 0.000100

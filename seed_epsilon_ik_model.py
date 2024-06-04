@@ -1,43 +1,35 @@
-import numpy as np
 import torch
 import torch.nn as nn
-from typing import Tuple
-from torch.utils.data import Dataset
-from tqdm import tqdm
 
-from common import JointValuesScalerInverse, TransformationUtility
 from fk import FK
-from affine_loss import AffineLoss
+from seed_epsilon_ik_config import SeedEpsilonIKConfig
 
 
 class SeedEpsilonIKEncoder(nn.Module):
 
-    def __init__(self, device, d_model=128, n_layers=6):
+    def __init__(self, device, config: SeedEpsilonIKConfig):
         super(SeedEpsilonIKEncoder, self).__init__()
 
         self.fk = FK(device)
 
-        self.d_model = d_model
-        self.n_layers = n_layers
-
         # pose, joints, joints_cos, joints_sin, seed_pose
-        self.fc1 = nn.Linear(12 + 7 + 7 + 7 + 12, d_model)
-        self.bn1 = nn.BatchNorm1d(d_model)
+        self.fc1 = nn.Linear(12 + 7 + 7 + 7 + 12, config.d_model)
+        self.bn1 = nn.BatchNorm1d(config.d_model)
 
-        self.fc2 = nn.Linear(d_model, d_model)
-        self.bn2 = nn.BatchNorm1d(d_model)
+        self.fc2 = nn.Linear(config.d_model, config.d_model)
+        self.bn2 = nn.BatchNorm1d(config.d_model)
 
-        self.fc3 = nn.Linear(d_model, d_model)
-        self.bn3 = nn.BatchNorm1d(d_model)
+        self.fc3 = nn.Linear(config.d_model, config.d_model)
+        self.bn3 = nn.BatchNorm1d(config.d_model)
 
-        self.fc4 = nn.Linear(d_model, d_model)
-        self.bn4 = nn.BatchNorm1d(d_model)
+        self.fc4 = nn.Linear(config.d_model, config.d_model)
+        self.bn4 = nn.BatchNorm1d(config.d_model)
 
-        self.fc5 = nn.Linear(d_model, d_model)
-        self.bn5 = nn.BatchNorm1d(d_model)
+        self.fc5 = nn.Linear(config.d_model, config.d_model)
+        self.bn5 = nn.BatchNorm1d(config.d_model)
 
-        self.fc6 = nn.Linear(d_model, d_model)
-        self.bn6 = nn.BatchNorm1d(d_model)
+        self.fc6 = nn.Linear(config.d_model, config.d_model)
+        self.bn6 = nn.BatchNorm1d(config.d_model)
 
         self.activation = nn.SiLU()
 
@@ -63,51 +55,56 @@ class SeedEpsilonIKEncoder(nn.Module):
 
 
 class SeedEpsilonIKModel(nn.Module):
-    def __init__(self, device, d_model=128, n_encoder_layers=6):
+    def __init__(self, device, config: SeedEpsilonIKConfig):
         super(SeedEpsilonIKModel, self).__init__()
 
-        self.encoder = SeedEpsilonIKEncoder(device, d_model=d_model, n_layers=n_encoder_layers)
+        self.encoder = SeedEpsilonIKEncoder(device, config)
 
         # pose, joint_cos, joint_sin, epsilon
-        self.fc1 = nn.Linear(d_model + 1, d_model)
-        self.bn1 = nn.BatchNorm1d(d_model)
+        self.fc1 = nn.Linear(config.d_model + 1, config.d_model)
+        self.bn1 = nn.BatchNorm1d(config.d_model)
 
-        self.fc2 = nn.Linear(d_model + 1, d_model)
-        self.bn2 = nn.BatchNorm1d(d_model)
+        self.fc2 = nn.Linear(config.d_model + 1, config.d_model)
+        self.bn2 = nn.BatchNorm1d(config.d_model)
 
-        self.fc3 = nn.Linear(d_model + 1, d_model)
-        self.bn3 = nn.BatchNorm1d(d_model)
+        self.fc3 = nn.Linear(config.d_model + 1, config.d_model)
+        self.bn3 = nn.BatchNorm1d(config.d_model)
 
-        self.fc4 = nn.Linear(d_model + 1, d_model)
-        self.bn4 = nn.BatchNorm1d(d_model)
+        self.fc4 = nn.Linear(config.d_model + 1, config.d_model)
+        self.bn4 = nn.BatchNorm1d(config.d_model)
 
-        self.fc5 = nn.Linear(d_model + 1, d_model)
-        self.bn5 = nn.BatchNorm1d(d_model)
+        self.fc5 = nn.Linear(config.d_model + 1, config.d_model)
+        self.bn5 = nn.BatchNorm1d(config.d_model)
 
-        self.fc6 = nn.Linear(d_model + 1, d_model)
-        self.bn6 = nn.BatchNorm1d(d_model)
+        self.fc6 = nn.Linear(config.d_model + 1, config.d_model)
+        self.bn6 = nn.BatchNorm1d(config.d_model)
 
-        self.fc_out = nn.Linear(d_model + 1, 7)
+        self.fc_joints = nn.Linear(config.d_model + 1, 7)
+        self.fc_diff = nn.Linear(config.d_model, 1)
 
         self.activation = nn.SiLU()
 
-    def forward(self, pose, seed, angle_diff) -> torch.Tensor:
+    def forward(self, pose, seed, max_diff) -> torch.Tensor:
         """
         :param pose: shape (batch_size, 12)
         :param seed: shape (batch_size, 7)
-        :param angle_diff: shape (batch_size, 1)
+        :param max_diff: shape (batch_size, 1)
         :return: 7 joints of xArm
         """
 
         encoder_output = self.encoder(pose, seed)
-        x1 = self.bn1(self.activation(self.fc1(torch.cat((encoder_output, angle_diff), dim=1))))
-        x2 = self.bn2(self.activation(self.fc2(torch.cat((x1, angle_diff), dim=1))))
-        x3 = self.bn3(self.activation(self.fc3(torch.cat((x1 + x2, angle_diff), dim=1))))
-        x4 = self.bn4(self.activation(self.fc4(torch.cat((x2 + x3, angle_diff), dim=1))))
-        x5 = self.bn5(self.activation(self.fc5(torch.cat((x3 + x4, angle_diff), dim=1))))
-        x6 = self.bn6(self.activation(self.fc6(torch.cat((x4 + x5, angle_diff), dim=1))))
 
-        x = self.fc_out(torch.cat((x5 + x6, angle_diff), dim=1))
+        pred_diff = self.fc_diff(encoder_output)
+        diff = torch.clamp(pred_diff, torch.zeros_like(max_diff), max_diff)
+
+        x1 = self.bn1(self.activation(self.fc1(torch.cat((encoder_output, diff), dim=1))))
+        x2 = self.bn2(self.activation(self.fc2(torch.cat((x1, diff), dim=1))))
+        x3 = self.bn3(self.activation(self.fc3(torch.cat((x1 + x2, diff), dim=1))))
+        x4 = self.bn4(self.activation(self.fc4(torch.cat((x2 + x3, diff), dim=1))))
+        x5 = self.bn5(self.activation(self.fc5(torch.cat((x3 + x4, diff), dim=1))))
+        x6 = self.bn6(self.activation(self.fc6(torch.cat((x4 + x5, diff), dim=1))))
+
+        x = self.fc_joints(torch.cat((x5 + x6, diff), dim=1))
         x = x / torch.norm(x, dim=-1, keepdim=True)
 
-        return seed + angle_diff * x
+        return seed + diff * x
