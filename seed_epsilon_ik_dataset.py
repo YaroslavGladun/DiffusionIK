@@ -2,18 +2,20 @@ import torch
 from typing import Tuple
 from torch.utils.data import Dataset
 
-from common import JointValuesScalerInverse
+from common import JointValuesScalerInverse, JointValuesClamp
 from fk import FK
+from seed_epsilon_ik_config import SeedEpsilonIKConfig
 
 
 class SeedEpsilonIKDataset(Dataset):
-    def __init__(self, device, batch_size, batch_count):
+    def __init__(self, device, batch_size, batch_count, config: SeedEpsilonIKConfig):
         self.device = device
         self.batch_size = batch_size
         self.batch_count = batch_count
         self.scaler = JointValuesScalerInverse(device)
+        self.clamp = JointValuesClamp(device)
         self.fk = FK(device)
-        self.max_seed_dist = torch.pi / 6
+        self.max_seed_dist = config.max_seed_dist
 
     def __len__(self):
         return self.batch_count * self.batch_size
@@ -36,7 +38,7 @@ class SeedEpsilonIKDataset(Dataset):
         random_directions = random_directions / torch.norm(random_directions, dim=-1, keepdim=True)
         random_diff = (0.01 + torch.rand(self.batch_size, 1, device=self.device)) * self.max_seed_dist
         seed_joints = target_joints + random_directions * random_diff
-        # seed_joints = torch.clamp(seed_joints, -torch.pi, torch.pi)
+        seed_joints = self.clamp(seed_joints)
 
         diff = torch.sqrt(torch.sum(torch.pow(target_joints - seed_joints, 2), dim=-1, keepdim=True))
 

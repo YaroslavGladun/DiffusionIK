@@ -8,6 +8,21 @@ JOINTS_LOWER_LIMIT = [-2.0 * pi, -2.059, -2.0 * pi, -0.19198, -2.0 * pi, -1.6929
 JOINTS_UPPER_LIMIT = [2.0 * pi, 2.0944, 2.0 * pi, 3.927, 2.0 * pi, pi, 2.0 * pi]
 
 
+class JointValuesClamp(nn.Module):
+    def __init__(self, device):
+        super(JointValuesClamp, self).__init__()
+        self.joints_min = torch.tensor(JOINTS_LOWER_LIMIT).to(device)
+        self.joints_max = torch.tensor(JOINTS_UPPER_LIMIT).to(device)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Clamps the input tensor to the joint limits
+        :param x: shape (N, 7) tensor of joint values
+        :return: shape (N, 7) tensor of joint values clamped to the joint limits
+        """
+        return torch.max(torch.min(x, self.joints_max), self.joints_min)
+
+
 class JointValuesScaler(nn.Module):
     def __init__(self, device):
         super(JointValuesScaler, self).__init__()

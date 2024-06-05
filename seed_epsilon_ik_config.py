@@ -1,2 +1,9 @@
+import math
+
+
 class SeedEpsilonIKConfig:
-    d_model = 1024
+    # dataset
+    max_seed_dist = math.pi / 18
+
+    # model
+    d_model = 512

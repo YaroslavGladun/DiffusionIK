@@ -18,8 +18,8 @@ model = SeedEpsilonIKModel(device, config).to(device)
 # model.load_state_dict(torch.load("seed_epsilon_ik_model.pth", map_location=device))
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-dataset = SeedEpsilonIKDataset(device, 8 * 2048, 1000)
-test_dataset = SeedEpsilonIKDataset(device, 8 * 2048, 10)
+dataset = SeedEpsilonIKDataset(device, 8 * 2048, 1000, config)
+test_dataset = SeedEpsilonIKDataset(device, 8 * 2048, 10, config)
 
 fk = FK(device)
 loss_fn = SeedEpsilonIKLoss(device)
