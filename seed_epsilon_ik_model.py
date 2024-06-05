@@ -80,7 +80,6 @@ class SeedEpsilonIKModel(nn.Module):
         self.bn6 = nn.BatchNorm1d(config.d_model)
 
         self.fc_joints = nn.Linear(config.d_model + 1, 7)
-        self.fc_diff = nn.Linear(config.d_model, 1)
 
         self.activation = nn.SiLU()
 
@@ -94,17 +93,14 @@ class SeedEpsilonIKModel(nn.Module):
 
         encoder_output = self.encoder(pose, seed)
 
-        pred_diff = self.fc_diff(encoder_output)
-        diff = torch.clamp(pred_diff, torch.zeros_like(max_diff), max_diff)
+        x1 = self.bn1(self.activation(self.fc1(torch.cat((encoder_output, max_diff), dim=1))))
+        x2 = self.bn2(self.activation(self.fc2(torch.cat((x1, max_diff), dim=1))))
+        x3 = self.bn3(self.activation(self.fc3(torch.cat((x1 + x2, max_diff), dim=1))))
+        x4 = self.bn4(self.activation(self.fc4(torch.cat((x2 + x3, max_diff), dim=1))))
+        x5 = self.bn5(self.activation(self.fc5(torch.cat((x3 + x4, max_diff), dim=1))))
+        x6 = self.bn6(self.activation(self.fc6(torch.cat((x4 + x5, max_diff), dim=1))))
 
-        x1 = self.bn1(self.activation(self.fc1(torch.cat((encoder_output, diff), dim=1))))
-        x2 = self.bn2(self.activation(self.fc2(torch.cat((x1, diff), dim=1))))
-        x3 = self.bn3(self.activation(self.fc3(torch.cat((x1 + x2, diff), dim=1))))
-        x4 = self.bn4(self.activation(self.fc4(torch.cat((x2 + x3, diff), dim=1))))
-        x5 = self.bn5(self.activation(self.fc5(torch.cat((x3 + x4, diff), dim=1))))
-        x6 = self.bn6(self.activation(self.fc6(torch.cat((x4 + x5, diff), dim=1))))
-
-        x = self.fc_joints(torch.cat((x5 + x6, diff), dim=1))
+        x = self.fc_joints(torch.cat((x5 + x6, max_diff), dim=1))
         x = x / torch.norm(x, dim=-1, keepdim=True)
 
-        return seed + diff * x
+        return seed + max_diff * x
