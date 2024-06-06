@@ -6,4 +6,4 @@ class SeedEpsilonIKConfig:
     max_seed_dist = math.pi / 18
 
     # model
-    d_model = 512
+    d_model = 1024
