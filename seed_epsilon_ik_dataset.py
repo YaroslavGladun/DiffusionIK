@@ -36,7 +36,7 @@ class SeedEpsilonIKDataset(Dataset):
         # seed_joints = torch.atan2(torch.sin(seed_joints), torch.cos(seed_joints))
         random_directions = torch.randn_like(target_joints)
         random_directions = random_directions / torch.norm(random_directions, dim=-1, keepdim=True)
-        random_diff = (0.01 + torch.rand(self.batch_size, 1, device=self.device)) * self.max_seed_dist
+        random_diff = (1e-4 + torch.rand(self.batch_size, 1, device=self.device) ** (1 / 7)) * self.max_seed_dist
         seed_joints = target_joints + random_directions * random_diff
         seed_joints = self.clamp(seed_joints)
 

@@ -79,6 +79,25 @@ class SeedEpsilonIKModel(nn.Module):
         self.fc6 = nn.Linear(config.d_model + 1, config.d_model)
         self.bn6 = nn.BatchNorm1d(config.d_model)
 
+        # Additional layers
+        self.fc7 = nn.Linear(config.d_model + 1, config.d_model)
+        self.bn7 = nn.BatchNorm1d(config.d_model)
+
+        self.fc8 = nn.Linear(config.d_model + 1, config.d_model)
+        self.bn8 = nn.BatchNorm1d(config.d_model)
+
+        self.fc9 = nn.Linear(config.d_model + 1, config.d_model)
+        self.bn9 = nn.BatchNorm1d(config.d_model)
+
+        self.fc10 = nn.Linear(config.d_model + 1, config.d_model)
+        self.bn10 = nn.BatchNorm1d(config.d_model)
+
+        self.fc11 = nn.Linear(config.d_model + 1, config.d_model)
+        self.bn11 = nn.BatchNorm1d(config.d_model)
+
+        self.fc12 = nn.Linear(config.d_model + 1, config.d_model)
+        self.bn12 = nn.BatchNorm1d(config.d_model)
+
         self.fc_joints = nn.Linear(config.d_model + 1, 7)
 
         self.activation = nn.SiLU()
@@ -100,7 +119,15 @@ class SeedEpsilonIKModel(nn.Module):
         x5 = self.bn5(self.activation(self.fc5(torch.cat((x3 + x4, max_diff), dim=1))))
         x6 = self.bn6(self.activation(self.fc6(torch.cat((x4 + x5, max_diff), dim=1))))
 
-        x = self.fc_joints(torch.cat((x5 + x6, max_diff), dim=1))
+        # Additional layers
+        x7 = self.bn7(self.activation(self.fc7(torch.cat((x5 + x6, max_diff), dim=1))))
+        x8 = self.bn8(self.activation(self.fc8(torch.cat((x6 + x7, max_diff), dim=1))))
+        x9 = self.bn9(self.activation(self.fc9(torch.cat((x7 + x8, max_diff), dim=1))))
+        x10 = self.bn10(self.activation(self.fc10(torch.cat((x8 + x9, max_diff), dim=1))))
+        x11 = self.bn11(self.activation(self.fc11(torch.cat((x9 + x10, max_diff), dim=1))))
+        x12 = self.bn12(self.activation(self.fc12(torch.cat((x10 + x11, max_diff), dim=1))))
+
+        x = self.fc_joints(torch.cat((x11 + x12, max_diff), dim=1))
         x = x / torch.norm(x, dim=-1, keepdim=True)
 
         return seed + max_diff * x

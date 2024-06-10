@@ -11,6 +11,20 @@ class AffineLoss(nn.Module):
         self.alpha = alpha
         self.beta = beta
 
+    def loss_fn(self, pred: Tuple[torch.Tensor, torch.Tensor],
+                target: Tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
+        R_pred, t_pred = pred
+        R_target, t_target = target
+
+        t_pred, t_target = t_pred.squeeze(dim=-1), t_target.squeeze(dim=-1)
+
+        t_loss = torch.sqrt(torch.sum(torch.square(t_pred - t_target), dim=-1))
+
+        R_loss = torch.sqrt(torch.sum(torch.square(R_pred - R_target), dim=-1))
+        R_loss = torch.mean(R_loss, dim=-1)
+
+        return self.alpha * R_loss + self.beta * t_loss
+
     def forward(self, pred: Tuple[torch.Tensor, torch.Tensor],
                 target: Tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
         """
