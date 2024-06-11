@@ -9,7 +9,7 @@ from fk import FK
 
 config = SeedEpsilonIKConfig()
 model = SeedEpsilonIKModel(torch.device('cuda'), config).to(torch.device('cuda'))
-model.load_state_dict(torch.load("/home/yaroslav/Desktop/DiffusionIK/weights/seed_epsilon_ik_model_2.pth",
+model.load_state_dict(torch.load("/home/yaroslav/Desktop/DiffusionIK/weights/seed_epsilon_ik_5_deg_model_30.pth",
                                  map_location=torch.device('cuda')))
 model.eval()
 
@@ -32,9 +32,9 @@ d_ = diff[torch.where(loss < config.upper_bound)][0]
 plt.plot(diff.cpu().detach().numpy(), loss.cpu().detach().numpy())
 
 d = d.cpu().detach().numpy()
-plt.axvline(x=d, color='r')
+# plt.axvline(x=d, color='r')
 
 d_with_min_loss = diff[loss.argmin()].cpu().detach().numpy()
-plt.axvline(x=d_.cpu().detach().numpy(), color='g')
+# plt.axvline(x=d_.cpu().detach().numpy(), color='g')
 
 plt.show()

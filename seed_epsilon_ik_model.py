@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+from typing import Tuple
+
 from fk import FK
 from seed_epsilon_ik_config import SeedEpsilonIKConfig
 
@@ -88,3 +90,10 @@ class SeedEpsilonIKModel(nn.Module):
         x = x / torch.norm(x, dim=-1, keepdim=True)
 
         return seed + self.config.max_seed_dist * x
+
+    def find_nearest_solution(self, pose, seed) -> torch.Tensor:
+        seed_R, seed_t = self.fk(seed)
+        target_R, target_t = pose[:, :9].view(-1, 3, 3), pose[:, 9:].view(-1, 3)
+
+    def _find_nearest_target_pose_with_solution(self, target_R, target_t, seed) -> Tuple[torch.Tensor, torch.Tensor]:
+        seed_R, seed_t = self.fk(seed)

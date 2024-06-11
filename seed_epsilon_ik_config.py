@@ -6,7 +6,7 @@ class SeedEpsilonIKConfig:
     max_seed_dist = 5 * math.pi / 180
 
     # model
-    d_model = 256
+    d_model = 512
 
     # sampling dataset for nearest ik
     upper_bound = 0.005
