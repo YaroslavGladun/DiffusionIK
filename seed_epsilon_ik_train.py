@@ -14,7 +14,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Device: {device}")
 config = SeedEpsilonIKConfig()
 model = SeedEpsilonIKModel(device, config).to(device)
-model.load_state_dict(torch.load("/home/yaroslav/Desktop/DiffusionIK/weights/seed_epsilon_ik_model_2.pth", map_location=device))
+# model.load_state_dict(torch.load("/home/yaroslav/Desktop/DiffusionIK/weights/seed_epsilon_ik_model_2.pth", map_location=device))
 
 # model.load_state_dict(torch.load("seed_epsilon_ik_model.pth", map_location=device))
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
@@ -25,7 +25,7 @@ test_dataset = SeedEpsilonIKDataset(device, 8 * 2048, 10, config)
 fk = FK(device)
 loss_fn = SeedEpsilonIKLoss(device)
 
-lr = 1e-7
+lr = 1e-4
 epoch = 0
 while True:
     model.train()
@@ -35,7 +35,7 @@ while True:
     test_dataset.max_seed_dist = dataset.max_seed_dist
     print(f"Seed std: {dataset.max_seed_dist:.4f}")
     for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
+        param_group['lr'] = lr * 0.997 ** epoch
         print(f"Learning rate: {lr:.6f}")
         break
 
@@ -92,10 +92,10 @@ while True:
 
         epoch += 1
 
-    if epoch % 2 == 0:
-        torch.save(model.state_dict(), f"/home/yaroslav/Desktop/DiffusionIK/weights/seed_epsilon_ik_model_{epoch}.pth")
+    if epoch % 100 == 0:
+        torch.save(model.state_dict(), f"/home/yaroslav/Desktop/DiffusionIK/weights/seed_epsilon_ik_5_deg_model_{epoch}.pth")
 
-    if epoch == 150:
+    if epoch == 1500:
         break
 
 # torch.save(model.state_dict(), "/content/drive/MyDrive/DiffusionIK/seed_epsilon_ik_model_2048_final.pth")
