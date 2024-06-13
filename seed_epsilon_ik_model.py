@@ -17,7 +17,7 @@ class SeedEpsilonIKModel(nn.Module):
 
         # self.encoder = SeedEpsilonIKEncoder(device, config)
 
-        # pose, joints, joints_cos, joints_sin, seed_pose
+        # target_pose, seed_joints, seed_joints_cos, seed_joints_sin, seed_pose
         self.fc1 = nn.Linear(12 + 7 + 7 + 7 + 12, config.d_model)
         self.bn1 = nn.BatchNorm1d(config.d_model)
 
@@ -59,11 +59,10 @@ class SeedEpsilonIKModel(nn.Module):
         self.activation = nn.SiLU()
         self.tanh = nn.Tanh()
 
-    def forward(self, pose, seed, max_diff) -> torch.Tensor:
+    def forward(self, pose, seed) -> torch.Tensor:
         """
         :param pose: shape (batch_size, 12)
         :param seed: shape (batch_size, 7)
-        :param max_diff: shape (batch_size, 1)
         :return: 7 joints of xArm
         """
 
@@ -94,6 +93,3 @@ class SeedEpsilonIKModel(nn.Module):
     def find_nearest_solution(self, pose, seed) -> torch.Tensor:
         seed_R, seed_t = self.fk(seed)
         target_R, target_t = pose[:, :9].view(-1, 3, 3), pose[:, 9:].view(-1, 3)
-
-    def _find_nearest_target_pose_with_solution(self, target_R, target_t, seed) -> Tuple[torch.Tensor, torch.Tensor]:
-        seed_R, seed_t = self.fk(seed)

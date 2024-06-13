@@ -8,6 +8,7 @@ from common import TransformationUtility
 from seed_epsilon_ik_model import SeedEpsilonIKModel
 from seed_epsilon_ik_dataset import SeedEpsilonIKDataset
 from seed_epsilon_ik_loss import SeedEpsilonIKLoss
+from affine_loss import AffineLoss
 from seed_epsilon_ik_config import SeedEpsilonIKConfig
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -23,9 +24,9 @@ dataset = SeedEpsilonIKDataset(device, 8 * 2048, 1000, config)
 test_dataset = SeedEpsilonIKDataset(device, 8 * 2048, 10, config)
 
 fk = FK(device)
-loss_fn = SeedEpsilonIKLoss(device)
+loss_fn = AffineLoss()
 
-lr = 1e-6
+lr = 1e-4
 epoch = 0
 while True:
     model.train()
@@ -40,18 +41,15 @@ while True:
         break
 
     for i in tqdm(range(dataset.batch_count)):
-        pose, seed, epsilon = dataset[i]
+        pose, seed = dataset[i]
 
         optimizer.zero_grad()
-        pred_joints = model(pose, seed, epsilon)
+        pred_joints = model(pose, seed)
         pred_pose_R, pred_pose_t = fk(pred_joints)
         pose_R, pose_t = pose[:, :9].view(-1, 3, 3), pose[:, 9:].view(-1, 3)
         loss = loss_fn(
             (pred_pose_R, pred_pose_t),
-            (pose_R, pose_t),
-            pred_joints,
-            seed,
-            epsilon
+            (pose_R, pose_t)
         )
         loss.backward()
         optimizer.step()
@@ -65,30 +63,19 @@ while True:
     model.eval()
     with torch.no_grad():
         test_loss_accum = 0
-        test_affine_loss_accum = 0
-        test_seed_loss_accum = 0
         for i in range(test_dataset.batch_count):
-            pose, seed, epsilon = test_dataset[i]
-            pred_joints = model(pose, seed, epsilon)
+            pose, seed = test_dataset[i]
+            pred_joints = model(pose, seed)
             pred_pose_R, pred_pose_t = fk(pred_joints)
             pose_R, pose_t = pose[:, :9].view(-1, 3, 3), pose[:, 9:].view(-1, 3)
             loss = loss_fn(
                 (pred_pose_R, pred_pose_t),
-                (pose_R, pose_t),
-                pred_joints,
-                seed,
-                epsilon
+                (pose_R, pose_t)
             )
             test_loss_accum += loss.item()
-            test_affine_loss_accum += loss_fn.get_affine_loss((pred_pose_R, pred_pose_t), (pose_R, pose_t)).item()
-            test_seed_loss_accum += loss_fn.get_seed_loss(pred_joints, seed, epsilon).item()
 
         avg_test_loss = test_loss_accum / test_dataset.batch_count
         print(f"Epoch {epoch} - Average testing loss: {avg_test_loss:.4f}")
-        avg_test_affine_loss = test_affine_loss_accum / test_dataset.batch_count
-        print(f"Epoch {epoch} - Average testing affine loss: {avg_test_affine_loss:.4f}")
-        avg_test_seed_loss = test_seed_loss_accum / test_dataset.batch_count
-        print(f"Epoch {epoch} - Average testing seed loss: {avg_test_seed_loss:.4f}")
 
         epoch += 1
 
