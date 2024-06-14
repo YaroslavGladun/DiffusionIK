@@ -15,13 +15,13 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Device: {device}")
 config = SeedEpsilonIKConfig()
 model = SeedEpsilonIKModel(device, config).to(device)
-model.load_state_dict(torch.load("/home/yaroslav/Desktop/DiffusionIK/weights/seed_epsilon_ik_5_deg_model_100.pth", map_location=device))
+# model.load_state_dict(torch.load("/home/yaroslav/Desktop/DiffusionIK/weights/seed_epsilon_ik_5_deg_model_15.pth", map_location=device))
 
 # model.load_state_dict(torch.load("seed_epsilon_ik_model.pth", map_location=device))
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
 dataset = SeedEpsilonIKDataset(device, 8 * 2048, 1000, config)
-test_dataset = SeedEpsilonIKDataset(device, 8 * 2048, 10, config)
+test_dataset = SeedEpsilonIKDataset(device, 8 * 2048, 1, config)
 
 fk = FK(device)
 loss_fn = AffineLoss()
@@ -44,7 +44,7 @@ while True:
         pose, seed = dataset[i]
 
         optimizer.zero_grad()
-        pred_joints = model(pose, seed)
+        pred_joints = model.forward_autoregressive(pose, seed)
         pred_pose_R, pred_pose_t = fk(pred_joints)
         pose_R, pose_t = pose[:, :9].view(-1, 3, 3), pose[:, 9:].view(-1, 3)
         loss = loss_fn(
@@ -65,7 +65,8 @@ while True:
         test_loss_accum = 0
         for i in range(test_dataset.batch_count):
             pose, seed = test_dataset[i]
-            pred_joints = model(pose, seed)
+            # pred_joints = model.forward_autoregressive(pose, seed)
+            pred_joints = model.forward_autoregressive(pose, seed)
             pred_pose_R, pred_pose_t = fk(pred_joints)
             pose_R, pose_t = pose[:, :9].view(-1, 3, 3), pose[:, 9:].view(-1, 3)
             loss = loss_fn(

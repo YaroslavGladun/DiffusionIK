@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+from tqdm import tqdm
 from typing import Tuple
 
 from fk import FK
@@ -48,16 +49,23 @@ class SeedEpsilonIKModel(nn.Module):
         self.fc10 = nn.Linear(config.d_model, config.d_model)
         self.bn10 = nn.BatchNorm1d(config.d_model)
 
-        self.fc11 = nn.Linear(config.d_model, config.d_model)
+        self.fc10_1 = nn.Linear(config.d_model, config.d_model)
+        self.bn10_1 = nn.BatchNorm1d(config.d_model)
+        self.fc10_2 = nn.Linear(config.d_model, config.d_model)
+        self.bn10_2 = nn.BatchNorm1d(config.d_model)
+        self.fc_diff = nn.Linear(config.d_model, 1)
+
+        self.fc11 = nn.Linear(config.d_model + 1, config.d_model)
         self.bn11 = nn.BatchNorm1d(config.d_model)
 
-        self.fc12 = nn.Linear(config.d_model, config.d_model)
+        self.fc12 = nn.Linear(config.d_model + 1, config.d_model)
         self.bn12 = nn.BatchNorm1d(config.d_model)
 
-        self.fc_joints = nn.Linear(config.d_model, 7)
+        self.fc_joints = nn.Linear(config.d_model + 1, 7)
 
         self.activation = nn.SiLU()
         self.tanh = nn.Tanh()
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, pose, seed) -> torch.Tensor:
         """
@@ -82,14 +90,20 @@ class SeedEpsilonIKModel(nn.Module):
         x8 = self.bn8(self.activation(self.fc8(x6 + x7)))
         x9 = self.bn9(self.activation(self.fc9(x7 + x8)))
         x10 = self.bn10(self.activation(self.fc10(x8 + x9)))
-        x11 = self.bn11(self.activation(self.fc11(x9 + x10)))
-        x12 = self.bn12(self.activation(self.fc12(x10 + x11 + x6)))
 
-        x = self.tanh(self.fc_joints(x11 + x12))
+        x10_1 = self.bn10_1(self.activation(self.fc10_1(x9 + x10)))
+        x10_2 = self.bn10_2(self.activation(self.fc10_2(x10 + x10_1)))
+        diff = self.sigmoid(self.fc_diff(x10_1 + x10_2))
+
+        x11 = self.bn11(self.activation(self.fc11(torch.cat((x9 + x10, diff), dim=1))))
+        x12 = self.bn12(self.activation(self.fc12(torch.cat((x9 + x10, diff), dim=1))))
+
+        x = self.tanh(self.fc_joints(torch.cat((x11 + x12, diff), dim=1)))
         x = x / torch.norm(x, dim=-1, keepdim=True)
 
-        return seed + self.config.max_seed_dist * x
+        return seed + diff * self.config.max_seed_dist * x
 
-    def find_nearest_solution(self, pose, seed) -> torch.Tensor:
-        seed_R, seed_t = self.fk(seed)
-        target_R, target_t = pose[:, :9].view(-1, 3, 3), pose[:, 9:].view(-1, 3)
+    def forward_autoregressive(self, pose, seed, n_steps=10):
+        for _ in range(n_steps):
+            seed = self.forward(pose, seed)
+        return seed
