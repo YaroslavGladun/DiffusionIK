@@ -21,13 +21,13 @@ class FK(nn.Module):
 
         self.joint_transforms = TransformationUtility.xyz_rpy_to_torch_affine(transformations)
 
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor, begin: int = 0, end: int = 7) -> Tuple[torch.Tensor, torch.Tensor]:
         R_result = torch.eye(3, device=x.device).unsqueeze(0).expand(x.size(0), 3, 3)
         t_result = torch.zeros(x.size(0), 3, 1, device=x.device)
 
         joint_rotations = TransformationUtility.rotation_z(x)
 
-        for i in range(7):
+        for i in range(begin, end):
             R, t = self.joint_transforms[0][i], self.joint_transforms[1][i]
             t_result = torch.matmul(R_result, t) + t_result
             R_result = torch.matmul(R_result, R)
@@ -35,21 +35,3 @@ class FK(nn.Module):
             R_result = torch.matmul(R_result, R_j)
 
         return R_result, t_result
-
-
-class RandomFKDataset(Dataset):
-    def __init__(self, device, batch_size, batch_count):
-        self.device = device
-        self.batch_size = batch_size
-        self.batch_count = batch_count
-        self.scaler = JointValuesScalerInverse(device)
-        self.fk = FK(device)
-
-    def __len__(self):
-        return self.batch_count * self.batch_size
-
-    def __getitem__(self, index):
-        joints = torch.rand(self.batch_size, 7, device=self.device)
-        joints = self.scaler(joints)
-        R, t = self.fk(joints)
-        return joints, R, t

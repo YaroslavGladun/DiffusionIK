@@ -59,18 +59,5 @@ class FKTest(unittest.TestCase):
         self.assertTrue(torch.allclose(target_positions, t_result, atol=1e-3))
 
 
-class RandomFKDatasetTest(unittest.TestCase):
-    def test_len(self):
-        dataset = RandomFKDataset('cpu', 10, 10)
-        self.assertEqual(100, len(dataset))
-
-    def test_get_item(self):
-        dataset = RandomFKDataset('cpu', 10, 10)
-        joints, Rs, ts = dataset[0]
-        self.assertEqual(torch.Size([10, 7]), joints.shape)
-        self.assertEqual(torch.Size([10, 3, 3]), Rs.shape)
-        self.assertEqual(torch.Size([10, 3, 1]), ts.shape)
-
-
 if __name__ == '__main__':
     unittest.main()
