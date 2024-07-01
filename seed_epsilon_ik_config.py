@@ -3,7 +3,7 @@ import math
 
 class SeedEpsilonIKConfig:
     # dataset
-    max_seed_dist = 5 * math.pi / 180
+    max_seed_dist = 15 * math.pi / 180
 
     # model
     d_model = 512

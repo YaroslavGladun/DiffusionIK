@@ -5,6 +5,7 @@ from typing import Tuple
 
 from fk import FK
 from seed_epsilon_ik_config import SeedEpsilonIKConfig
+from common import JointValuesClamp
 
 
 class SeedEpsilonIKModel(nn.Module):
@@ -15,10 +16,8 @@ class SeedEpsilonIKModel(nn.Module):
 
         self.fk = FK(device)
 
-        # self.encoder = SeedEpsilonIKEncoder(device, config)
-
-        # pose, joints, joints_cos, joints_sin, seed_pose
-        self.fc1 = nn.Linear(12 + 7 + 7 + 7 + 12, config.d_model)
+        # pose, joints, joints_cos, joints_sin, seed_features
+        self.fc1 = nn.Linear(12 + 7 + 7 + 7 + 336, config.d_model)
         self.bn1 = nn.BatchNorm1d(config.d_model)
 
         self.fc2 = nn.Linear(config.d_model, config.d_model)
@@ -58,6 +57,7 @@ class SeedEpsilonIKModel(nn.Module):
 
         self.activation = nn.SiLU()
         self.tanh = nn.Tanh()
+        self.clamp = JointValuesClamp(device)
 
     def forward(self, pose, seed, max_diff) -> torch.Tensor:
         """
@@ -69,9 +69,13 @@ class SeedEpsilonIKModel(nn.Module):
 
         seed_cos = torch.cos(seed)
         seed_sin = torch.sin(seed)
-        seed_R, seed_t = self.fk(seed)
-        seed_pose = torch.cat([seed_R.view(-1, 9), seed_t.view(-1, 3)], dim=-1)
-        x = torch.cat((pose, seed, seed_cos, seed_sin, seed_pose), dim=1)
+        fk_features = []
+        for begin in range(0, 7):
+            for end in range(begin + 1, 8):
+                R, t = self.fk(seed, begin, end)
+                fk_features.append(torch.cat([R.view(-1, 9), t.view(-1, 3)], dim=-1))
+        fk_features = torch.cat(fk_features, dim=1)
+        x = torch.cat((pose, seed, seed_cos, seed_sin, fk_features), dim=1)
 
         x1 = self.bn1(self.activation(self.fc1(x)))
         x2 = self.bn2(self.activation(self.fc2(x1)))
@@ -88,12 +92,5 @@ class SeedEpsilonIKModel(nn.Module):
 
         x = self.tanh(self.fc_joints(x11 + x12))
         x = x / torch.norm(x, dim=-1, keepdim=True)
-
-        return seed + self.config.max_seed_dist * x
-
-    def find_nearest_solution(self, pose, seed) -> torch.Tensor:
-        seed_R, seed_t = self.fk(seed)
-        target_R, target_t = pose[:, :9].view(-1, 3, 3), pose[:, 9:].view(-1, 3)
-
-    def _find_nearest_target_pose_with_solution(self, target_R, target_t, seed) -> Tuple[torch.Tensor, torch.Tensor]:
-        seed_R, seed_t = self.fk(seed)
+        x = self.clamp(seed + self.config.max_seed_dist * x)
+        return x
