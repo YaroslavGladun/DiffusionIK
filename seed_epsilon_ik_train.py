@@ -25,7 +25,7 @@ test_dataset = SeedEpsilonIKDataset(device, 8 * 2048, 10, config)
 fk = FK(device)
 loss_fn = SeedEpsilonIKLoss(device)
 
-lr = 1e-6
+lr = 1e-2
 epoch = 0
 while True:
     model.train()
@@ -50,8 +50,7 @@ while True:
             (pred_pose_R, pred_pose_t),
             (pose_R, pose_t),
             pred_joints,
-            seed,
-            epsilon
+            seed
         )
         loss.backward()
         optimizer.step()
@@ -76,19 +75,12 @@ while True:
                 (pred_pose_R, pred_pose_t),
                 (pose_R, pose_t),
                 pred_joints,
-                seed,
-                epsilon
+                seed
             )
             test_loss_accum += loss.item()
-            test_affine_loss_accum += loss_fn.get_affine_loss((pred_pose_R, pred_pose_t), (pose_R, pose_t)).item()
-            test_seed_loss_accum += loss_fn.get_seed_loss(pred_joints, seed, epsilon).item()
 
         avg_test_loss = test_loss_accum / test_dataset.batch_count
         print(f"Epoch {epoch} - Average testing loss: {avg_test_loss:.4f}")
-        avg_test_affine_loss = test_affine_loss_accum / test_dataset.batch_count
-        print(f"Epoch {epoch} - Average testing affine loss: {avg_test_affine_loss:.4f}")
-        avg_test_seed_loss = test_seed_loss_accum / test_dataset.batch_count
-        print(f"Epoch {epoch} - Average testing seed loss: {avg_test_seed_loss:.4f}")
 
         epoch += 1
 

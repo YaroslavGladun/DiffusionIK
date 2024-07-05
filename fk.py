@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
 from typing import Tuple
-from torch.utils.data import Dataset
-from common import JointValuesScalerInverse, TransformationUtility
+from common import TransformationUtility
 
 
 class FK(nn.Module):

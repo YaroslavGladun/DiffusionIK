@@ -41,7 +41,7 @@ class SeedEpsilonIKDataset(Dataset):
         seed_joints = self.clamp(seed_joints)
 
         diff = torch.sqrt(torch.sum(torch.pow(target_joints - seed_joints, 2), dim=-1, keepdim=True))
-        diff = torch.max(diff, torch.tensor(self.max_seed_dist, device=self.device))
+        # diff = torch.max(diff, torch.tensor(self.max_seed_dist, device=self.device))
 
         return target_pose, seed_joints, diff
 
