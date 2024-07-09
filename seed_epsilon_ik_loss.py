@@ -16,10 +16,23 @@ class SeedEpsilonIKLoss(nn.Module):
 
     def forward(
             self,
-            pred_pose: Tuple[torch.Tensor, torch.Tensor],
             target_pose: Tuple[torch.Tensor, torch.Tensor],
-            pred_joints,
+            pred_delta,
             seed_joints: torch.Tensor):
-        d1 = self.affine_loss.loss_fn(pred_pose, target_pose)
-        d2 = self.affine_loss.loss_fn(self.fk(pred_joints), self.fk(seed_joints))
-        return torch.mean(d1 / d2)
+        cartesian_distance = self.affine_loss.loss_fn(target_pose, self.fk(seed_joints + pred_delta))
+        norm = self.affine_loss.loss_fn(target_pose, self.fk(seed_joints))
+        cartesian_loss = torch.mean(cartesian_distance / norm)
+        cartesian_loss_std = torch.std(cartesian_distance / norm)
+
+        seed_loss = torch.norm(pred_delta, dim=-1) / norm
+        seed_loss = torch.mean(seed_loss)
+
+        # count where cartesian_loss >= 1
+        cartesian_distance_norm = cartesian_distance / norm
+        bad_predictions_ratio = torch.count_nonzero(cartesian_distance_norm >= 1) / cartesian_distance_norm.shape[0]
+
+        return {"loss": 1e0 * cartesian_loss + 0 * seed_loss,
+                "cartesian_loss": cartesian_loss,
+                "cartesian_loss_std": cartesian_loss_std,
+                "seed_loss": seed_loss,
+                "bad_predictions_ratio": bad_predictions_ratio}

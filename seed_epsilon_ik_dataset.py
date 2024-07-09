@@ -33,7 +33,7 @@ class SeedEpsilonIKDataset(Dataset):
 
         # seed_joints = torch.rand(self.batch_size, 7, device=self.device)
         # seed_joints = self.scaler(seed_joints)
-        # seed_joints = torch.atan2(torch.sin(seed_joints), torch.cos(seed_joints))
+
         random_directions = torch.randn_like(target_joints)
         random_directions = random_directions / torch.norm(random_directions, dim=-1, keepdim=True)
         random_diff = (1e-4 + torch.rand(self.batch_size, 1, device=self.device) ** (1 / 7)) * self.max_seed_dist
@@ -41,7 +41,6 @@ class SeedEpsilonIKDataset(Dataset):
         seed_joints = self.clamp(seed_joints)
 
         diff = torch.sqrt(torch.sum(torch.pow(target_joints - seed_joints, 2), dim=-1, keepdim=True))
-        # diff = torch.max(diff, torch.tensor(self.max_seed_dist, device=self.device))
 
         return target_pose, seed_joints, diff
 

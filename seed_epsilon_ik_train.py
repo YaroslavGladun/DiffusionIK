@@ -1,101 +1,97 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from tqdm import tqdm
-from fk import FK
+import wandb
 
+from tqdm import tqdm
+from collections import defaultdict
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+
+from fk import FK
 from common import TransformationUtility
 from seed_epsilon_ik_model import SeedEpsilonIKModel
 from seed_epsilon_ik_dataset import SeedEpsilonIKDataset
 from seed_epsilon_ik_loss import SeedEpsilonIKLoss
 from seed_epsilon_ik_config import SeedEpsilonIKConfig
+from affine_loss import AffineLoss
+
+config = SeedEpsilonIKConfig()
+wandb.init(
+    project="ik",
+    config=vars(config)
+)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Device: {device}")
-config = SeedEpsilonIKConfig()
 model = SeedEpsilonIKModel(device, config).to(device)
-model.load_state_dict(torch.load("/home/yaroslav/Desktop/DiffusionIK/weights/seed_epsilon_ik_5_deg_model_15.pth", map_location=device))
+# model.load_state_dict(
+#     torch.load("/home/yaroslav/Desktop/DiffusionIK/weights/seed_epsilon_ik_5_deg_model_45.pth", map_location=device))
 
-# model.load_state_dict(torch.load("seed_epsilon_ik_model.pth", map_location=device))
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
+scheduler = ReduceLROnPlateau(optimizer, factor=0.5, patience=3, threshold=1e-2, threshold_mode="abs", min_lr=1e-6, verbose=True)
 
 dataset = SeedEpsilonIKDataset(device, 8 * 2048, 1000, config)
-test_dataset = SeedEpsilonIKDataset(device, 8 * 2048, 10, config)
+test_dataset = SeedEpsilonIKDataset(device, 8 * 2048, 1, config)
 
 fk = FK(device)
 loss_fn = SeedEpsilonIKLoss(device)
+loss_affine = AffineLoss(alpha=1.0, beta=1.0)
 
-lr = 1e-2
 epoch = 0
 while True:
     model.train()
 
-    train_loss_accum = 0
+    train_loss_accum = defaultdict(float)
 
     test_dataset.max_seed_dist = dataset.max_seed_dist
     print(f"Seed std: {dataset.max_seed_dist:.4f}")
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr * 0.997 ** epoch
-        print(f"Learning rate: {lr:.6f}")
-        break
 
     for i in tqdm(range(dataset.batch_count)):
         pose, seed, epsilon = dataset[i]
 
         optimizer.zero_grad()
-        pred_joints = model(pose, seed, epsilon)
-        pred_pose_R, pred_pose_t = fk(pred_joints)
+        pred_delta = model(pose, seed, epsilon)
         pose_R, pose_t = pose[:, :9].view(-1, 3, 3), pose[:, 9:].view(-1, 3)
         loss = loss_fn(
-            (pred_pose_R, pred_pose_t),
             (pose_R, pose_t),
-            pred_joints,
+            pred_delta,
             seed
         )
-        loss.backward()
+        loss["loss"].backward()
         optimizer.step()
 
-        train_loss_accum += loss.item()
+        for key in loss:
+            if isinstance(loss[key], torch.Tensor):
+                train_loss_accum[key] += loss[key].item()
+            else:
+                train_loss_accum[key] += loss[key]
+    for key in train_loss_accum:
+        train_loss_accum[key] /= dataset.batch_count
 
-    avg_train_loss = train_loss_accum / dataset.batch_count
+    for key in train_loss_accum:
+        print(f"Epoch {epoch} - Average training {key}: {train_loss_accum[key]:.4f}")
 
-    print(f"Epoch {epoch} - Average training loss: {avg_train_loss:.4f}")
+    wandb.log(train_loss_accum)
 
-    model.eval()
-    with torch.no_grad():
-        test_loss_accum = 0
-        test_affine_loss_accum = 0
-        test_seed_loss_accum = 0
-        for i in range(test_dataset.batch_count):
-            pose, seed, epsilon = test_dataset[i]
-            pred_joints = model(pose, seed, epsilon)
-            pred_pose_R, pred_pose_t = fk(pred_joints)
-            pose_R, pose_t = pose[:, :9].view(-1, 3, 3), pose[:, 9:].view(-1, 3)
-            loss = loss_fn(
-                (pred_pose_R, pred_pose_t),
-                (pose_R, pose_t),
-                pred_joints,
-                seed
-            )
-            test_loss_accum += loss.item()
+    # log learning rate of the optimizer
+    wandb.log({"lr": optimizer.param_groups[0]["lr"]})
+    print(f"Epoch {epoch} - Learning rate: {optimizer.param_groups[0]['lr']:.7f}")
 
-        avg_test_loss = test_loss_accum / test_dataset.batch_count
-        print(f"Epoch {epoch} - Average testing loss: {avg_test_loss:.4f}")
+    scheduler.step(train_loss_accum["loss"])
 
-        epoch += 1
+    # model.eval()
+    # with torch.no_grad():
+    #     pose, seed, epsilon = test_dataset[0]
+    #     prediction = model.find_ik(pose, seed, n_times=10)
+
+        # print(f"Epoch {epoch} - Test loss: {loss.item():.4f}")
+    epoch += 1
 
     if epoch % 15 == 0:
-        torch.save(model.state_dict(), f"/home/yaroslav/Desktop/DiffusionIK/weights/seed_epsilon_ik_5_deg_model_{epoch}.pth")
+        torch.save(model.state_dict(),
+                   f"/home/yaroslav/Desktop/DiffusionIK/weights/seed_epsilon_ik_5_deg_model_{epoch}.pth")
 
     if epoch == 1500:
         break
 
 # torch.save(model.state_dict(), "/content/drive/MyDrive/DiffusionIK/seed_epsilon_ik_model_2048_final.pth")
-
-
-# Epoch 6 - Average training loss: 0.0309
-# Epoch 6 - Average testing loss: 0.0288
-# Epoch 6 - Average testing affine loss: 0.0288
-# Epoch 6 - Average testing seed loss: 0.0446
-# Seed std: 0.5236
-# Learning rate: 0.000100

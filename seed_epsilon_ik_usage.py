@@ -29,4 +29,6 @@ print(epsilon.shape)
 plt.scatter(loss.cpu().numpy(), epsilon.cpu().numpy(), s=10, alpha=0.05)
 plt.xlabel("Affine loss")
 plt.ylabel("Epsilon")
+# set equal scale
+plt.gca().set_aspect('equal', adjustable='box')
 plt.show()
