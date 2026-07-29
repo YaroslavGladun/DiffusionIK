@@ -1,0 +1,21 @@
+[project]
+name = "diffusion-ik"
+version = "0.1.0"
+description = "Neural IK for xArm 7-DOF"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.0",
+    "numpy",
+    "wandb",
+    "tqdm",
+    "gradio>=4.0",
+    "trimesh",
+    "plotly>=5.0",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
