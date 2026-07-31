@@ -493,7 +493,8 @@ def main():
         sd = torch.load(args.ckpt, map_location=device)
         if isinstance(sd, dict) and "state_dict" in sd:
             sd = sd["state_dict"]
-        sd = {k: v.float() for k, v in sd.items()}  # accept fp16-saved weights
+        sd = {k: (v.float() if v.is_floating_point() else v)
+              for k, v in sd.items()}  # accept fp16-saved weights
         model.load_state_dict(sd)
         with open(args.ckpt, "rb") as f:
             ckpt_info.update({
