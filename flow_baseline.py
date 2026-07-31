@@ -16,6 +16,11 @@ Usage:
     uv run python flow_baseline.py train  [--steps 20000]
     uv run python flow_baseline.py eval   [--ckpt flow_xarm7.pt]
     uv run python flow_baseline.py all
+
+Recommended full-budget training on a GPU (matches the scale at which the
+original IKFlow is trained; ~1.5-2 h on an RTX 4090):
+    uv run python flow_baseline.py all --steps 300000 --batch 4096 \
+        --hidden 512 --layers 16 --singular-too
 """
 
 import argparse
