@@ -153,11 +153,10 @@ def train(args, device):
             q = torch.rand(args.batch, DIM, device=device) * (hi - lo) + lo
             R, t = fk(q)
             x = to_norm(q)
-            # SoftFlow: log-uniform noise magnitude, injected into x and c
-            logs = (torch.rand(args.batch, 1, device=device) *
-                    (math.log10(args.soft_max) - math.log10(args.soft_min)) +
-                    math.log10(args.soft_min))
-            sigma = 10.0 ** logs
+            # SoftFlow: uniform noise magnitude (as in the SoftFlow/IKFlow
+            # recipe), injected into x and appended to c
+            sigma = (torch.rand(args.batch, 1, device=device) *
+                     (args.soft_max - args.soft_min) + args.soft_min)
             x = x + sigma * torch.randn_like(x)
             c = cond_vec(R, t, sigma)
         loss = model.nll(x, c)
