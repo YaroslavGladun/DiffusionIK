@@ -1,0 +1,33 @@
+{
+  "main": {
+    "SR_any_pct": 0.0,
+    "SR_per_candidate_pct": 0.0,
+    "SR_wilson95": [
+      0.0,
+      27.75401687666166
+    ],
+    "pos_mm": {
+      "mean": 629.2587518692017,
+      "median": 613.1924390792847,
+      "p95": 1107.8940629959106
+    },
+    "ori_deg": {
+      "mean": 124.42591127995912,
+      "median": 129.65256327814964,
+      "p95": 177.4611144114359
+    },
+    "time_ms_per_query_batch50": 0.5910873413085938,
+    "solutions_per_target": 10,
+    "diversity_successful_rad": null,
+    "diversity_all_rad": 9.588338565826415,
+    "n_params": 861780,
+    "train_config": {
+      "layers": 12,
+      "hidden": 256,
+      "steps": 300,
+      "batch": 512,
+      "lr": 0.0002,
+      "n_params": 861780
+    }
+  }
+}

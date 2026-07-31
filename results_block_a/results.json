@@ -1,0 +1,107 @@
+{
+  "protocol": {
+    "targets": 500,
+    "seed": 0,
+    "pos_thresh_mm": 1.0,
+    "ori_thresh_deg": 1.0,
+    "platform_note": "DLS timed on CPU (single process); learning-based methods timed on GPU as noted per row."
+  },
+  "dls": {
+    "SR_pct": 99.80000257492065,
+    "pos_mm": {
+      "mean": 0.1992017641896382,
+      "median": 0.13324398605618626,
+      "p95": 0.5303888465277851
+    },
+    "ori_deg": {
+      "mean": 0.04401808125096615,
+      "median": 0.0,
+      "p95": 0.23086826467223237
+    },
+    "time_ms_per_query": 93.03192901611328,
+    "solutions_per_target": 1,
+    "diversity": "No",
+    "batch_wall_s": 7.028162002563477,
+    "latency": {
+      "median_ms": 93.03192901611328,
+      "mean_ms": 483.765380859375,
+      "p95_ms": 2089.217529296875
+    },
+    "restarts": {
+      "mean": 0.7839999794960022,
+      "max": 10
+    },
+    "SR_wilson95": [
+      98.87590072528046,
+      99.96468726904155
+    ],
+    "solved_only": {
+      "pos_mm": {
+        "mean": 0.1971629390027374,
+        "median": 0.13324398605618626,
+        "p95": 0.5207002977840602
+      },
+      "ori_deg": {
+        "mean": 0.04410629007584782,
+        "median": 0.0,
+        "p95": 0.2310367248848084
+      }
+    },
+    "solver": {
+      "iters": 150,
+      "lam": 0.05,
+      "max_restarts": 10
+    }
+  },
+  "dls-singular": {
+    "SR_pct": 99.00000095367432,
+    "pos_mm": {
+      "mean": 0.37662219256162643,
+      "median": 0.31759616103954613,
+      "p95": 0.5863768164999783
+    },
+    "ori_deg": {
+      "mean": 0.05025695546472364,
+      "median": 0.0,
+      "p95": 0.22424057993893992
+    },
+    "time_ms_per_query": 242.50755310058594,
+    "solutions_per_target": 1,
+    "diversity": "No",
+    "batch_wall_s": 8.951613903045654,
+    "latency": {
+      "median_ms": 242.50755310058594,
+      "mean_ms": 803.4539794921875,
+      "p95_ms": 4090.237060546875
+    },
+    "restarts": {
+      "mean": 0.9919999837875366,
+      "max": 10
+    },
+    "SR_wilson95": [
+      97.68065646212351,
+      99.57213092184797
+    ],
+    "solved_only": {
+      "pos_mm": {
+        "mean": 0.30960829462856054,
+        "median": 0.31294519430957735,
+        "p95": 0.5659805028699338
+      },
+      "ori_deg": {
+        "mean": 0.04079554263866926,
+        "median": 0.0,
+        "p95": 0.2055842250459542
+      }
+    },
+    "solver": {
+      "iters": 150,
+      "lam": 0.05,
+      "max_restarts": 10
+    },
+    "manipulability": {
+      "mean": 0.000823770125862211,
+      "median": 0.0008818619535304606
+    }
+  }
+}
