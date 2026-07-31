@@ -36,7 +36,7 @@ from benchmark_block_a import (make_test_set, make_near_singular_set,
 RAD2DEG = 180.0 / math.pi
 M2MM = 1000.0
 DIM = 7
-CDIM = 12
+CDIM = 13  # 12-D pose + 1-D SoftFlow noise magnitude (as in IKFlow)
 
 
 class CouplingMLP(nn.Module):
@@ -124,9 +124,17 @@ def normalizers(device):
     return lo, hi, to_norm, from_norm
 
 
-def cond_vec(R, t):
+def cond_vec(R, t, sigma=None):
+    """Pose conditioning + SoftFlow noise magnitude. The solution set of a
+    pose is a 1-D manifold in the 7-D joint space (measure zero), so plain
+    MLE training leaves the base-Gaussian mass spread far from it. SoftFlow
+    (used by IKFlow for exactly this reason) perturbs the data with noise of
+    a random magnitude and conditions the flow on that magnitude; sampling
+    with the smallest magnitude then concentrates mass near the manifold."""
     B = R.shape[0]
-    return torch.cat([R.reshape(B, 9), t.reshape(B, 3)], dim=1)
+    if sigma is None:
+        sigma = torch.zeros(B, 1, device=R.device)
+    return torch.cat([R.reshape(B, 9), t.reshape(B, 3), sigma * 10.0], dim=1)
 
 
 def train(args, device):
@@ -144,8 +152,14 @@ def train(args, device):
         with torch.no_grad():
             q = torch.rand(args.batch, DIM, device=device) * (hi - lo) + lo
             R, t = fk(q)
-            c = cond_vec(R, t)
             x = to_norm(q)
+            # SoftFlow: log-uniform noise magnitude, injected into x and c
+            logs = (torch.rand(args.batch, 1, device=device) *
+                    (math.log10(args.soft_max) - math.log10(args.soft_min)) +
+                    math.log10(args.soft_min))
+            sigma = 10.0 ** logs
+            x = x + sigma * torch.randn_like(x)
+            c = cond_vec(R, t, sigma)
         loss = model.nll(x, c)
         opt.zero_grad()
         loss.backward()
@@ -182,8 +196,9 @@ def evaluate(args, device):
         n, m_samp = R_t.shape[0], args.samples
         Rx = R_t.repeat_interleave(m_samp, 0)
         tx = t_t.repeat_interleave(m_samp, 0)
+        sig = torch.full((Rx.shape[0], 1), args.soft_min, device=device)
         t0 = time.time()
-        q = from_norm(model.sample(cond_vec(Rx, tx)).clamp(-1, 1))
+        q = from_norm(model.sample(cond_vec(Rx, tx, sig)).clamp(-1, 1))
         wall = time.time() - t0
         R_p, t_p = fk(q)
         pos = (t_p - tx).squeeze(-1).norm(dim=-1)
@@ -230,6 +245,8 @@ def main():
     ap.add_argument('--lr', type=float, default=2e-4)
     ap.add_argument('--layers', type=int, default=12)
     ap.add_argument('--hidden', type=int, default=256)
+    ap.add_argument('--soft-min', type=float, default=1e-3)
+    ap.add_argument('--soft-max', type=float, default=0.2)
     ap.add_argument('--ckpt', type=str, default='flow_xarm7.pt')
     ap.add_argument('--targets', type=int, default=500)
     ap.add_argument('--samples', type=int, default=50)
