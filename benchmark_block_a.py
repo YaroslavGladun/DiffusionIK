@@ -20,6 +20,8 @@ Methods implemented here:
                            DDIM 50 steps + CFG w=1.5, 50 samples
     *-refine             — plus gradient refinement through differentiable FK
                            (200 steps, lr 0.005 — the paper's full regime)
+    *-singular           — same method evaluated on the near-singular set
+                           (e.g. condj0-refine-singular, diffusion-singular)
 
 Usage:
     uv run python benchmark_block_a.py --methods dls,dls-singular
@@ -489,21 +491,32 @@ def main():
                 restarts=restarts.cpu().numpy(), q_best=best_q.cpu().numpy())
             print(json.dumps(m, indent=2)[:600])
         elif method.split('-')[0] in ('condj0', 'flow', 'diffusion'):
-            base_name = method.split('-')[0]
+            parts = method.split('-')
+            base_name = parts[0]
             refine = ((args.refine_steps, args.refine_lr)
-                      if method.endswith('-refine') else None)
+                      if 'refine' in parts[1:] else None)
             loader = {'condj0': load_condj0, 'flow': load_flow,
                       'diffusion': load_diffusion}[base_name]
             ckpt = {'condj0': args.ckpt_condj0, 'flow': args.ckpt_flow,
                     'diffusion': args.ckpt_diffusion}[base_name]
             sampler = loader(ckpt, device)
-            _, R_t, t_t = make_test_set(args.targets, args.seed, device)
+            extra_set = {}
+            if 'singular' in parts[1:]:
+                _, R_t, t_t, w = make_near_singular_set(
+                    args.targets, args.seed, device)
+                extra_set = {'manipulability': {
+                    'mean': w.mean().item(), 'median': w.median().item()}}
+                print(f'  near-singular set: manipulability median '
+                      f'{w.median().item():.2e}')
+            else:
+                _, R_t, t_t = make_test_set(args.targets, args.seed, device)
             m, arrays = eval_multicandidate(
                 fk, sampler, R_t, t_t, args.samples, pos_thr, ori_thr,
                 refine=refine)
             m['checkpoint'] = ckpt or 'RANDOM_INIT'
             if refine:
                 m['refine'] = {'steps': args.refine_steps, 'lr': args.refine_lr}
+            m.update(extra_set)
             results[method] = m
             import numpy as np
             np.savez_compressed(os.path.join(args.out, f'perpose_{method}.npz'),
