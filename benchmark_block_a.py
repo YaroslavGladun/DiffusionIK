@@ -259,7 +259,7 @@ def load_condj0(path, device):
     return sample
 
 
-def load_flow(path, device):
+def load_flow(path, device, temperature=1.0):
     from flow_baseline import ConditionalRealNVP, cond_vec, normalizers
     _, _, _, from_norm = normalizers(device)
     ck = torch.load(path, map_location=device) if path else None
@@ -277,7 +277,8 @@ def load_flow(path, device):
         Rx = R_t.repeat_interleave(m, 0)
         tx = t_t.repeat_interleave(m, 0)
         sig = torch.full((Rx.shape[0], 1), 1e-3, device=device)
-        q = from_norm(model.sample(cond_vec(Rx, tx, sig)).clamp(-1, 1))
+        q = from_norm(model.sample(cond_vec(Rx, tx, sig),
+                                   temperature=temperature).clamp(-1, 1))
         return q, Rx, tx
     return sample
 
@@ -416,6 +417,9 @@ def main():
     ap.add_argument('--ckpt-diffusion', type=str, default=None)
     ap.add_argument('--refine-steps', type=int, default=200)
     ap.add_argument('--refine-lr', type=float, default=0.005)
+    ap.add_argument('--flow-temp', type=float, default=1.0,
+                    help='flow sampling temperature (select via '
+                         'flow_baseline.py sweep on the validation set)')
     args = ap.parse_args()
 
     device = torch.device(args.device if args.device else
@@ -499,7 +503,8 @@ def main():
                       'diffusion': load_diffusion}[base_name]
             ckpt = {'condj0': args.ckpt_condj0, 'flow': args.ckpt_flow,
                     'diffusion': args.ckpt_diffusion}[base_name]
-            sampler = loader(ckpt, device)
+            sampler = (load_flow(ckpt, device, args.flow_temp)
+                       if base_name == 'flow' else loader(ckpt, device))
             extra_set = {}
             if 'singular' in parts[1:]:
                 _, R_t, t_t, w = make_near_singular_set(
@@ -516,6 +521,8 @@ def main():
             m['checkpoint'] = ckpt or 'RANDOM_INIT'
             if refine:
                 m['refine'] = {'steps': args.refine_steps, 'lr': args.refine_lr}
+            if base_name == 'flow' and args.flow_temp != 1.0:
+                m['sampling_temperature'] = args.flow_temp
             m.update(extra_set)
             results[method] = m
             import numpy as np

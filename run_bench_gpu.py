@@ -10,11 +10,16 @@ to results_block_a/results.json (existing rows are kept):
     flow_xarm7.pt                   flow[-refine][-singular]
 
 Usage (Kaggle T4 / any CUDA box):
-    python run_bench_gpu.py
+    python run_bench_gpu.py [--flow-temp T]
+
+--flow-temp: sampling temperature for the flow rows; pick it first with
+    python flow_baseline.py sweep --ckpt flow_xarm7.pt
+(selected on a validation pose set, seed=1, so the test set stays clean).
 
 Safe to re-run: each invocation just re-measures the rows for the
 checkpoints it finds. ~10-15 min per checkpoint on a T4.
 """
+import argparse
 import os
 import subprocess
 import sys
@@ -30,6 +35,9 @@ ROWS = [
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--flow-temp', type=float, default=1.0)
+    args = ap.parse_args()
     if not torch.cuda.is_available():
         sys.exit('CUDA GPU required — this runner exists so the heavy rows '
                  'are timed on GPU (the protocol notes learned methods are '
@@ -43,6 +51,8 @@ def main():
         cmd = [sys.executable, 'benchmark_block_a.py',
                '--methods', methods, flag, ckpt,
                '--targets', '500', '--samples', '50']
+        if flag == '--ckpt-flow':
+            cmd += ['--flow-temp', str(args.flow_temp)]
         print('>>>', ' '.join(cmd), flush=True)
         subprocess.run(cmd, check=True)
         ran = True

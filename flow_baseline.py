@@ -36,7 +36,7 @@ from fk import FK
 from common import JOINTS_LOWER_LIMIT, JOINTS_UPPER_LIMIT
 from eval_ik import geodesic_distance
 from benchmark_block_a import (make_test_set, make_near_singular_set,
-                               wilson_ci)
+                               wilson_ci, fk_refine)
 
 RAD2DEG = 180.0 / math.pi
 M2MM = 1000.0
@@ -202,7 +202,8 @@ def evaluate(args, device):
         tx = t_t.repeat_interleave(m_samp, 0)
         sig = torch.full((Rx.shape[0], 1), args.soft_min, device=device)
         t0 = time.time()
-        q = from_norm(model.sample(cond_vec(Rx, tx, sig)).clamp(-1, 1))
+        q = from_norm(model.sample(cond_vec(Rx, tx, sig),
+                                   temperature=args.temp).clamp(-1, 1))
         wall = time.time() - t0
         R_p, t_p = fk(q)
         pos = (t_p - tx).squeeze(-1).norm(dim=-1)
@@ -233,6 +234,7 @@ def evaluate(args, device):
             'diversity_all_rad': sum(div_all) / len(div_all),
             'n_params': ck['config']['n_params'],
             'train_config': ck['config'],
+            'sampling_temperature': args.temp,
         }
         print(set_name, json.dumps(results[set_name])[:400])
     out = 'results_block_a/flow_results.json'
@@ -241,9 +243,60 @@ def evaluate(args, device):
     print('saved', out)
 
 
+@torch.no_grad()
+def sweep(args, device):
+    """Sampling-temperature sweep — IKFlow's own eval-time knob (latent
+    scaling). Selects the best temperature on a VALIDATION pose set
+    (seed=1), so the canonical test set (seed=0) stays untouched; the
+    winning value is then passed to the benchmark via --flow-temp."""
+    fk = FK(device)
+    _, _, _, from_norm = normalizers(device)
+    ck = torch.load(args.ckpt, map_location=device)
+    model = ConditionalRealNVP(ck['config']['layers'],
+                               ck['config']['hidden']).to(device)
+    model.load_state_dict(ck['state_dict'])
+    model.eval()
+
+    n, m_samp = args.sweep_targets, args.samples
+    _, R_t, t_t = make_test_set(n, 1, device)          # seed=1: validation
+    Rx = R_t.repeat_interleave(m_samp, 0)
+    tx = t_t.repeat_interleave(m_samp, 0)
+    sig = torch.full((Rx.shape[0], 1), args.soft_min, device=device)
+    c = cond_vec(Rx, tx, sig)
+
+    temps = [float(t) for t in args.temps.split(',')]
+    print(f'validation: {n} poses (seed=1) x {m_samp} samples; '
+          f'refine 200 @ lr 0.005')
+    print(f'{"temp":>6} {"SR_raw,%":>9} {"SR_refined,%":>13} '
+          f'{"pos_med_raw,mm":>15} {"div_all,rad":>12}')
+    best = (None, -1.0, -1.0)
+    for T in temps:
+        q = from_norm(model.sample(c, temperature=T).clamp(-1, 1))
+        R_p, t_p = fk(q)
+        pos = (t_p - tx).squeeze(-1).norm(dim=-1)
+        ori = geodesic_distance(R_p, Rx)
+        succ = ((pos < 1e-3) & (ori < math.pi / 180)).view(n, m_samp)
+        sr_raw = succ.any(1).float().mean().item() * 100
+        qr = fk_refine(q, Rx, tx, fk, steps=200, lr=0.005)
+        R_p, t_p = fk(qr)
+        pos_r = (t_p - tx).squeeze(-1).norm(dim=-1)
+        ori_r = geodesic_distance(R_p, Rx)
+        succ_r = ((pos_r < 1e-3) & (ori_r < math.pi / 180)).view(n, m_samp)
+        sr_ref = succ_r.any(1).float().mean().item() * 100
+        qv = q.view(n, m_samp, DIM)
+        div = sum(torch.pdist(qv[i]).mean().item() for i in range(n)) / n
+        print(f'{T:6.2f} {sr_raw:9.2f} {sr_ref:13.2f} '
+              f'{pos.median().item() * M2MM:15.1f} {div:12.2f}', flush=True)
+        if (sr_ref, sr_raw) > (best[1], best[2]):
+            best = (T, sr_ref, sr_raw)
+    print(f'\nbest: temperature={best[0]} '
+          f'(SR_refined={best[1]:.2f}%, SR_raw={best[2]:.2f}%)')
+    print(f'-> final benchmark: python run_bench_gpu.py --flow-temp {best[0]}')
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('mode', choices=['train', 'eval', 'all'])
+    ap.add_argument('mode', choices=['train', 'eval', 'all', 'sweep'])
     ap.add_argument('--steps', type=int, default=20000)
     ap.add_argument('--batch', type=int, default=2048)
     ap.add_argument('--lr', type=float, default=2e-4)
@@ -256,6 +309,12 @@ def main():
     ap.add_argument('--samples', type=int, default=50)
     ap.add_argument('--singular-too', action='store_true')
     ap.add_argument('--device', type=str, default=None)
+    ap.add_argument('--temp', type=float, default=1.0,
+                    help='sampling temperature for eval mode')
+    ap.add_argument('--temps', type=str,
+                    default='1.0,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2',
+                    help='temperatures tried by sweep mode')
+    ap.add_argument('--sweep-targets', type=int, default=200)
     args = ap.parse_args()
     device = torch.device(args.device if args.device else
                           ('cuda' if torch.cuda.is_available() else 'cpu'))
@@ -265,6 +324,8 @@ def main():
         train(args, device)
     if args.mode in ('eval', 'all'):
         evaluate(args, device)
+    if args.mode == 'sweep':
+        sweep(args, device)
 
 
 if __name__ == '__main__':
